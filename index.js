@@ -1,9 +1,16 @@
 // Inspired by https://www.geeksforgeeks.org/javascript/how-to-create-stopwatch-using-html-css-and-javascript/
 
+const DEFAULT_COUNTDOWN_DURATION = 120;
+const DEFAULT_ALERT_DURATION = 10;
+const DEFAULT_PAUSE_DURATION = 5;
+
 const START_BUTTON = document.getElementById("start");
 const STOP_BUTTON = document.getElementById("stop");
 const RESET_BUTTON = document.getElementById("reset");
-const COUNTDOWN = document.getElementById("countdown")
+const COUNTDOWN = document.getElementById("countdown");
+const COUNTDOWN_DURATION_INPUT = document.getElementById("countdown-duration");
+const ALERT_DURATION_INPUT = document.getElementById("alert-duration");
+const PAUSE_DURATION_INPUT = document.getElementById("pause-duration");
 
 const TimerState = Object.freeze({
   IDLE: 0,
@@ -105,10 +112,21 @@ class Timer {
   }
 }
 
-const TIMER = new Timer(120, 5, 5, "next");
+const TIMER = new Timer(DEFAULT_COUNTDOWN_DURATION, DEFAULT_ALERT_DURATION, DEFAULT_PAUSE_DURATION, "next");
+
 START_BUTTON.addEventListener("click", function () {
+  TIMER.countdownDuration = parseInt(COUNTDOWN_DURATION_INPUT.value);
+  TIMER.alertDuration = parseInt(ALERT_DURATION_INPUT.value);
+  TIMER.pauseDuration = parseInt(PAUSE_DURATION_INPUT.value);
   TIMER.start();
 });
+
 STOP_BUTTON.addEventListener("click", function () {
   TIMER.stop();
 });
+
+window.onload = function () {
+  COUNTDOWN_DURATION_INPUT.value = DEFAULT_COUNTDOWN_DURATION;
+  ALERT_DURATION_INPUT.value = DEFAULT_ALERT_DURATION;
+  PAUSE_DURATION_INPUT.value = DEFAULT_PAUSE_DURATION;
+};

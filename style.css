@@ -67,3 +67,8 @@ body {
 #stop {
   background-color: #c91400;
 }
+
+#values {
+  margin-top: 20px;
+  color: white;
+}
