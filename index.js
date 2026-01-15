@@ -5,63 +5,110 @@ const STOP_BUTTON = document.getElementById("stop");
 const RESET_BUTTON = document.getElementById("reset");
 const COUNTDOWN = document.getElementById("countdown")
 
-const PAUSE_MESSAGE = "next";
-const COUNTDOWN_DURATION = 120;
-const PAUSE_DURATION = 5;
-
 const TimerState = Object.freeze({
-  COUNTING_DOWN: 0,
-  PAUSED: 1
+  IDLE: 0,
+  RUNNING: 1,
+  ALERTING: 2,
+  PAUSED: 3
 });
 
-const TIMER_INFO = {
-  state: TimerState.COUNTING_DOWN,
-  intervalId: null,
-  startTime: null
-};
+class Timer {
+  constructor(countdownDuration, alertDuration, pauseDuration, pauseMessage) {
+    this.countdownDuration = countdownDuration;
+    this.alertDuration = alertDuration;
+    this.pauseDuration = pauseDuration;
+    this.pauseMessage = pauseMessage;
+    this.state = TimerState.IDLE;
+    this.intervalId = null;
+    this.startTime = null;
+  }
 
-function step() {
-  if (!TIMER_INFO.startTime) { return; }
+  start() {
+    if (this.state != TimerState.IDLE) { return; }
 
-  const elapsed = Date.now() - TIMER_INFO.startTime;
-  const seconds = elapsed / 1000;
+    this.state = TimerState.RUNNING;
+    this.setCountdownClass();
+    this.startTime = Date.now();
+    let self = this;
+    this.intervalId = setInterval(function () { self.step() }, 10);
+  }
 
-  switch (TIMER_INFO.state) {
-    case TimerState.COUNTING_DOWN: {
-      const remaining = COUNTDOWN_DURATION - seconds;
-      if (remaining <= 0) {
-        COUNTDOWN.innerHTML = PAUSE_MESSAGE;
-        TIMER_INFO.state = 1;
-        TIMER_INFO.startTime = Date.now();
-      } else {
-        COUNTDOWN.innerHTML = remaining.toFixed(1);
+  stop() {
+    if (this.state == TimerState.IDLE) { return; }
+
+    clearInterval(this.intervalId);
+    this.intervalId = null;
+    this.startTime = null;
+    this.state = TimerState.IDLE;
+    this.setCountdownClass();
+    COUNTDOWN.innerHTML = "&ndash;&ndash;&ndash;";
+  }
+
+  step() {
+    if (this.state == TimerState.IDLE) { return; }
+
+    const elapsed = Date.now() - this.startTime;
+    const seconds = elapsed / 1000;
+
+    switch (this.state) {
+      case TimerState.RUNNING: {
+        const remaining = this.countdownDuration - seconds;
+        if (remaining <= this.alertDuration) {
+          this.state = TimerState.ALERTING;
+          this.setCountdownClass();
+        } else {
+          COUNTDOWN.innerHTML = remaining.toFixed(1);
+        }
+        break;
       }
-      break;
+      case TimerState.ALERTING: {
+        const remaining = this.countdownDuration - seconds;
+        if (remaining <= 0) {
+          this.state = TimerState.PAUSED;
+          this.setCountdownClass();
+          COUNTDOWN.innerHTML = this.pauseMessage;
+          this.startTime = Date.now();
+        } else {
+          COUNTDOWN.innerHTML = remaining.toFixed(1);
+        }
+        break;
+      }
+      case TimerState.PAUSED: {
+        const remaining = this.pauseDuration - seconds;
+        if (remaining <= 0) {
+          this.state = TimerState.RUNNING;
+          this.setCountdownClass();
+          COUNTDOWN.innerHTML = this.countdownDuration.toFixed(1);
+          this.startTime = Date.now();
+        }
+        break;
+      }
     }
-    case TimerState.PAUSED: {
-      const remaining = PAUSE_DURATION - seconds;
-      if (remaining <= 0) {
-        COUNTDOWN.innerHTML = COUNTDOWN_DURATION.toFixed(1);
-        TIMER_INFO.state = 0;
-        TIMER_INFO.startTime = Date.now();
-      }
-      break;
+  }
+
+  setCountdownClass() {
+    COUNTDOWN.classList.remove("idle", "running", "alerting", "paused");
+    switch (this.state) {
+      case TimerState.IDLE:
+        COUNTDOWN.classList.add("idle");
+        break;
+      case TimerState.RUNNING:
+        COUNTDOWN.classList.add("running");
+        break;
+      case TimerState.ALERTING:
+        COUNTDOWN.classList.add("alerting");
+        break;
+      case TimerState.PAUSED:
+        COUNTDOWN.classList.add("paused");
+        break;
     }
   }
 }
 
+const TIMER = new Timer(120, 5, 5, "next");
 START_BUTTON.addEventListener("click", function () {
-  if (!TIMER_INFO.startTime) {
-    TIMER_INFO.startTime = Date.now();
-    TIMER_INFO.intervalId = setInterval(step, 10);
-  }
+  TIMER.start();
 });
-
 STOP_BUTTON.addEventListener("click", function () {
-  if (TIMER_INFO.startTime) {
-    clearInterval(TIMER_INFO.intervalId);
-    TIMER_INFO.intervalId = null;
-    COUNTDOWN.innerHTML = "&ndash;&ndash;&ndash;";
-    TIMER_INFO.startTime = null;
-  }
+  TIMER.stop();
 });

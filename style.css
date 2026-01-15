@@ -16,7 +16,29 @@ body {
 
 #countdown {
   font-size: 20em;
-  color: #fff;
+}
+
+.idle {
+  color: grey;
+}
+
+.running {
+  color: white;
+}
+
+.alerting {
+  color: red;
+  animation: blink 0.5s linear infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.paused {
+  color: cyan;
 }
 
 #buttons {
