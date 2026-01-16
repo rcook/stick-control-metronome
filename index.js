@@ -1,5 +1,3 @@
-// Inspired by https://www.geeksforgeeks.org/javascript/how-to-create-stopwatch-using-html-css-and-javascript/
-
 const DEFAULT_COUNTDOWN_DURATION = 120;
 const DEFAULT_ALERT_DURATION = 10;
 const DEFAULT_PAUSE_DURATION = 5;
@@ -86,15 +84,15 @@ const TimerState = Object.freeze({
 });
 
 class Timer {
-  constructor(ui, countdownDuration, alertDuration, pauseDuration, pauseMessage) {
+  constructor(ui) {
     this.ui = ui;
-    this.countdownDuration = countdownDuration;
-    this.alertDuration = alertDuration;
-    this.pauseDuration = pauseDuration;
-    this.pauseMessage = pauseMessage;
     this.state = TimerState.IDLE;
-    this.intervalId = null;
+    this.countdownDuration = null;
+    this.alertDuration = null;
+    this.pauseDuration = null;
+    this.iteration = null;
     this.startTime = null;
+    this.intervalId = null;
   }
 
   start(countdownDuration, alertDuration, pauseDuration) {
@@ -103,11 +101,10 @@ class Timer {
     this.countdownDuration = countdownDuration;
     this.alertDuration = alertDuration;
     this.pauseDuration = pauseDuration;
-    this.state = TimerState.RUNNING;
-    this.setCountdownClass();
-    this.startTime = Date.now();
+    this.iteration = 0;
+    this.#pause();
     let self = this;
-    this.intervalId = setInterval(() => { self.step() }, 10);
+    this.intervalId = setInterval(() => { self.#step() }, 10);
   }
 
   stop() {
@@ -117,11 +114,14 @@ class Timer {
     this.intervalId = null;
     this.startTime = null;
     this.state = TimerState.IDLE;
-    this.setCountdownClass();
-    this.ui.countdownSpan.innerHTML = "&ndash;&ndash;&ndash;";
+    this.#updateCountdown("&ndash;&ndash;&ndash;");
+    this.iteration = null;
+    this.pauseDuration = null;
+    this.alertDuration = null;
+    this.countdownDuration = null;
   }
 
-  step() {
+  #step() {
     if (this.state == TimerState.IDLE) { return; }
 
     const elapsed = Date.now() - this.startTime;
@@ -132,7 +132,7 @@ class Timer {
         const remaining = this.countdownDuration - seconds;
         if (remaining <= this.alertDuration) {
           this.state = TimerState.ALERTING;
-          this.setCountdownClass();
+          this.#updateCountdown(null);
         } else {
           this.ui.countdownSpan.innerHTML = remaining.toFixed(1);
         }
@@ -141,10 +141,7 @@ class Timer {
       case TimerState.ALERTING: {
         const remaining = this.countdownDuration - seconds;
         if (remaining <= 0) {
-          this.state = TimerState.PAUSED;
-          this.setCountdownClass();
-          this.ui.countdownSpan.innerHTML = this.pauseMessage;
-          this.startTime = Date.now();
+          this.#pause();
         } else {
           this.ui.countdownSpan.innerHTML = remaining.toFixed(1);
         }
@@ -154,7 +151,7 @@ class Timer {
         const remaining = this.pauseDuration - seconds;
         if (remaining <= 0) {
           this.state = TimerState.RUNNING;
-          this.setCountdownClass();
+          this.#updateCountdown(null);
           this.ui.countdownSpan.innerHTML = this.countdownDuration.toFixed(1);
           this.startTime = Date.now();
         }
@@ -163,7 +160,15 @@ class Timer {
     }
   }
 
-  setCountdownClass() {
+  #pause() {
+    const iteration = ++this.iteration;
+    this.state = TimerState.PAUSED;
+    this.#updateCountdown(`get ready (${h(iteration)})`);
+    this.startTime = Date.now();
+  }
+
+
+  #updateCountdown(html) {
     let cls;
     switch (this.state) {
       case TimerState.IDLE: cls = "idle"; break;
@@ -171,18 +176,21 @@ class Timer {
       case TimerState.ALERTING: cls = "alerting"; break;
       case TimerState.PAUSED: cls = "paused"; break;
     }
+    if (html) {
+      this.ui.countdownSpan.innerHTML = html;
+    }
     this.ui.countdownSpan.classList.remove("idle", "running", "alerting", "paused");
     this.ui.countdownSpan.classList.add(cls);
   }
 }
 
 const UI = new Ui();
-const TIMER = new Timer(UI, DEFAULT_COUNTDOWN_DURATION, DEFAULT_ALERT_DURATION, DEFAULT_PAUSE_DURATION, "next");
+const TIMER = new Timer(UI);
 
 UI.startButton.addEventListener("click", () => {
   const countdownDuration = parseInt(UI.countdownDurationInput.value);
   const alertDuration = parseInt(UI.alertDurationInput.value);
-  const pauseDuration = parseInt(UI.alertDurationInput.value);
+  const pauseDuration = parseInt(UI.pauseDurationInput.value);
   TIMER.start(countdownDuration, alertDuration, pauseDuration);
 });
 

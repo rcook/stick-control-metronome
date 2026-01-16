@@ -14,21 +14,24 @@ body {
   background-color: rgb(0, 61, 0);
 }
 
-#countdown {
-  font-size: 20em;
+#time {
+  min-height: 400px;
 }
 
 .idle {
   color: grey;
+  font-size: 20em;
 }
 
 .running {
   color: white;
+  font-size: 20em;
 }
 
 .alerting {
   color: red;
   animation: blink 0.5s linear infinite;
+  font-size: 20em;
 }
 
 @keyframes blink {
@@ -38,7 +41,8 @@ body {
 }
 
 .paused {
-  color: cyan;
+  color: yellow;
+  font-size: 5em;
 }
 
 #buttons {
