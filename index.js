@@ -3,11 +3,10 @@
 const DEFAULT_COUNTDOWN_DURATION = 120;
 const DEFAULT_ALERT_DURATION = 10;
 const DEFAULT_PAUSE_DURATION = 5;
+const DEFAULT_TEMPO = 100;
+const DEFAULT_REPETITIONS = 20;
+const DEFAULT_RATE = 8;
 
-const REPETITIONS = 20;
-const RATE = 8;
-
-const PRESETS = document.getElementById("presets");
 const START_BUTTON = document.getElementById("start");
 const STOP_BUTTON = document.getElementById("stop");
 const RESET_BUTTON = document.getElementById("reset");
@@ -24,45 +23,54 @@ function attr(s) {
   return new Option(s).innerHTML.replace("\"", "&quot;");
 }
 
-function showPresets(presets) {
-  const ul = document.createElement("ul");
-  PRESETS.appendChild(ul)
-  for (const preset of presets) {
-    const li = document.createElement("li");
-    ul.appendChild(li);
-
-    const button = document.createElement("button");
-    li.appendChild(button);
-
-    let countdownDuration;
-    let alertDuration;
-    let pauseDuration;
-    let descriptor;
-    if (Object.hasOwn(preset, "bpm")) {
-      countdownDuration = Math.round(60 / preset.bpm * RATE * REPETITIONS);
-      alertDuration = DEFAULT_ALERT_DURATION;
-      pauseDuration = DEFAULT_PAUSE_DURATION;
-      descriptor = null;
-    } else {
-      countdownDuration = preset.countdownDuration;
-      alertDuration = preset.alertDuration;
-      pauseDuration = preset.pauseDuration;
-      descriptor = `${countdownDuration}/${alertDuration}/${pauseDuration}`;
+function populateSettings(tempoSelectId, repetitionsSelectId, applyButtonId, presets) {
+  const tempoSelect = document.getElementById(tempoSelectId);
+  for (let tempo = 60; tempo <= 200; tempo += 5) {
+    const e = document.createElement("option");
+    e.value = tempo;
+    e.innerText = tempo.toString();
+    if (tempo == DEFAULT_TEMPO) {
+      e.selected = true;
     }
+    tempoSelect.appendChild(e);
+  }
 
-    button.countdownDuration = countdownDuration;
-    button.alertDuration = alertDuration;
-    button.pauseDuration = pauseDuration;
+  const repetitionsSelect = document.getElementById(repetitionsSelectId);
+  for (const repetitions of [1, 2, 5, 10, 20, 50]) {
+    const e = document.createElement("option");
+    e.value = repetitions;
+    e.innerText = repetitions.toString();
+    if (repetitions == DEFAULT_REPETITIONS) {
+      e.selected = true;
+    }
+    repetitionsSelect.appendChild(e);
+  }
 
-    const s = descriptor ? `${preset.name} (${descriptor})` : preset.name;
-    button.innerText = s;
+  const applyButton = document.getElementById(applyButtonId);
+  applyButton.addEventListener("click", e => {
+    const tempo = parseInt(tempoSelect.value);
+    const repetitions = parseInt(repetitionsSelect.value);
+    const countdownDuration = Math.round(60 / tempo * DEFAULT_RATE * repetitions);
+    COUNTDOWN_DURATION_INPUT.value = countdownDuration;
+    ALERT_DURATION_INPUT.value = DEFAULT_ALERT_DURATION;
+    PAUSE_DURATION_INPUT.value = DEFAULT_PAUSE_DURATION;
+  });
+
+  const presetsSpan = document.getElementById("presets");
+  for (const preset of presets) {
+    const button = document.createElement("button");
+    presetsSpan.appendChild(button);
+
+    button.countdownDuration = preset.countdownDuration;
+    button.alertDuration = preset.alertDuration;
+    button.pauseDuration = preset.pauseDuration;
+    const descriptor = `${preset.countdownDuration}/${preset.alertDuration}/${preset.pauseDuration}`;
+    button.innerText = `${preset.name} (${descriptor})`;
     button.addEventListener("click", e => {
       COUNTDOWN_DURATION_INPUT.value = e.target.countdownDuration;
       ALERT_DURATION_INPUT.value = e.target.alertDuration;
       PAUSE_DURATION_INPUT.value = e.target.pauseDuration;
     });
-
-
   }
 }
 
@@ -188,12 +196,10 @@ window.onload = () => {
   PAUSE_DURATION_INPUT.value = DEFAULT_PAUSE_DURATION;
 };
 
-
 fetch("data.json")
   .then(response => response.json())
   .then(data => {
-    if (Object.hasOwn(data, "presets")) {
-      showPresets(data.presets);
-    }
+    const presets = Object.hasOwn(data, "presets") ? data.presets : [];
+    populateSettings("tempo", "repetitions", "apply", presets);
   })
   .catch(e => alert(`Could not parse JSON from server: ${e}\n\nPlease ask Richard to fix this!`));

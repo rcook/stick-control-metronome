@@ -19,16 +19,30 @@
       <button class="button" id="stop">Stop</button>
     </div>
 
-    <div id="values">
-      Countdown time: <input id="countdown-duration" type="number" min="30" max="480">
-      Alert time: <input id="alert-duration" type="number" min="0" max="480">
-      Pause time: <input id="pause-duration" type="number" min="0" max="480">
-    </div>
+    <div id="settings">
+      <div id="values">
+        <label for="countdown-duration">Countdown time</label>:
+        <input id="countdown-duration" type="number" min="30" max="480">
+        <label for="alert-duration">Alert time</label>:
+        <input id="alert-duration" type="number" min="0" max="480">
+        <label for="pause-duration">Pause time</label>:
+        <input id="pause-duration" type="number" min="0" max="480">
+      </div>
 
-    <div id="presets"></div>
+      <div>
+        <label for="tempo">Tempo</label>
+        <select id="tempo"></select>
+        <label for="repetitions">Repetitions</label>
+        <select id="repetitions"></select>
+        <button id="apply">Apply</button>
+        <span id="presets"></span>
+      </div>
+
+    </div>
   </div>
 
   <script src="index.js"></script>
 
 </body>
+
 </html>

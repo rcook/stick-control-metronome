@@ -68,13 +68,7 @@ body {
   background-color: #c91400;
 }
 
-#values {
+#settings {
   margin-top: 20px;
   color: white;
-}
-
-#presets li {
-  color: white;
-  list-style-type: none;
-  display: inline;
 }
