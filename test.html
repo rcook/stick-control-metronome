@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <style>
+    html,
+    body,
+    #container {
+      height: 100%;
+      margin: 0;
+      background-color: darkgreen;
+      font-family: Verdana, Geneva, Tahoma, sans-serif;
+      color: white;
+    }
+
+    #container {
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: 1.5fr 3fr 1fr 2fr;
+      gap: 0px 0px;
+      grid-template-areas:
+        "context"
+        "time"
+        "controls"
+        "settings";
+    }
+
+    .cell {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: calc(100% + 2vw);
+    }
+
+    #context {
+      grid-area: context;
+    }
+
+    #time {
+      grid-area: time;
+      font-size: calc(100% + 15vw);
+    }
+
+    #controls {
+      grid-area: controls;
+    }
+
+    #controls button {
+      font-size: calc(100% + 0.05vw);
+      margin: 10px;
+      padding: 10px;
+      border-radius: 15px;
+    }
+
+    #settings {
+      grid-area: settings;
+      font-size: calc(100% + 0.05vw);
+    }
+
+    #start {
+      background-color: green;
+      color: yellow;
+    }
+
+    #stop {
+      background-color: red;
+      color: yellow;
+    }
+
+    .idle {
+      color: grey;
+    }
+
+    .running {
+      color: yellow;
+    }
+
+    .alerting {
+      color: red;
+      animation: blink 0.5s linear infinite;
+    }
+
+    @keyframes blink {
+      50% {
+        opacity: 0;
+      }
+    }
+
+    .paused {
+      color: lightgrey;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="container">
+    <div id="context" class="cell">exercise 1</div>
+    <div id="time" class="cell alerting">123.4</div>
+    <div id="controls" class="cell">
+      <button id="start">Start</button>
+      <button id="stop">Stop</button>
+    </div>
+    <div id="settings" class="cell">
+      <div id="values">
+        <label for="countdown-duration">Countdown time</label>:
+        <input id="countdown-duration" type="number" min="30" max="480">
+        <label for="alert-duration">Alert time</label>:
+        <input id="alert-duration" type="number" min="0" max="480">
+        <label for="pause-duration">Pause time</label>:
+        <input id="pause-duration" type="number" min="0" max="480">
+      </div>
+      <div>
+        <label for="tempo">Tempo</label>:
+        <select id="tempo"></select>
+        <label for="repetitions">Repetitions</label>:
+        <select id="repetitions"></select>
+        <button id="apply">Apply</button>
+        <span id="presets"></span>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>
