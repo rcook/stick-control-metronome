@@ -7,14 +7,6 @@ const DEFAULT_TEMPO = 100;
 const DEFAULT_REPETITIONS = 20;
 const DEFAULT_RATE = 8;
 
-const START_BUTTON = document.getElementById("start");
-const STOP_BUTTON = document.getElementById("stop");
-const RESET_BUTTON = document.getElementById("reset");
-const COUNTDOWN = document.getElementById("countdown");
-const COUNTDOWN_DURATION_INPUT = document.getElementById("countdown-duration");
-const ALERT_DURATION_INPUT = document.getElementById("alert-duration");
-const PAUSE_DURATION_INPUT = document.getElementById("pause-duration");
-
 function h(s) {
   return new Option(s).innerHTML;
 }
@@ -23,54 +15,66 @@ function attr(s) {
   return new Option(s).innerHTML.replace("\"", "&quot;");
 }
 
-function populateSettings(tempoSelectId, repetitionsSelectId, applyButtonId, presets) {
-  const tempoSelect = document.getElementById(tempoSelectId);
-  for (let tempo = 60; tempo <= 200; tempo += 5) {
-    const e = document.createElement("option");
-    e.value = tempo;
-    e.innerText = tempo.toString();
-    if (tempo == DEFAULT_TEMPO) {
-      e.selected = true;
-    }
-    tempoSelect.appendChild(e);
+class Ui {
+  constructor() {
+    this.startButton = document.getElementById("start");
+    this.stopButton = document.getElementById("stop");
+    this.resetButton = document.getElementById("reset");
+    this.countdownSpan = document.getElementById("countdown");
+    this.countdownDurationInput = document.getElementById("countdown-duration");
+    this.alertDurationInput = document.getElementById("alert-duration");
+    this.pauseDurationInput = document.getElementById("pause-duration");
+    this.tempoSelect = document.getElementById("tempo");
+    this.repetitionsSelect = document.getElementById("repetitions");
+    this.applyButton = document.getElementById("apply");
   }
 
-  const repetitionsSelect = document.getElementById(repetitionsSelectId);
-  for (const repetitions of [1, 2, 5, 10, 20, 50]) {
-    const e = document.createElement("option");
-    e.value = repetitions;
-    e.innerText = repetitions.toString();
-    if (repetitions == DEFAULT_REPETITIONS) {
-      e.selected = true;
+  populateSettings(presets) {
+    for (let tempo = 60; tempo <= 200; tempo += 5) {
+      const e = document.createElement("option");
+      e.value = tempo;
+      e.innerText = tempo.toString();
+      if (tempo == DEFAULT_TEMPO) {
+        e.selected = true;
+      }
+      this.tempoSelect.appendChild(e);
     }
-    repetitionsSelect.appendChild(e);
-  }
 
-  const applyButton = document.getElementById(applyButtonId);
-  applyButton.addEventListener("click", e => {
-    const tempo = parseInt(tempoSelect.value);
-    const repetitions = parseInt(repetitionsSelect.value);
-    const countdownDuration = Math.round(60 / tempo * DEFAULT_RATE * repetitions);
-    COUNTDOWN_DURATION_INPUT.value = countdownDuration;
-    ALERT_DURATION_INPUT.value = DEFAULT_ALERT_DURATION;
-    PAUSE_DURATION_INPUT.value = DEFAULT_PAUSE_DURATION;
-  });
+    for (const repetitions of [1, 2, 5, 10, 20, 50]) {
+      const e = document.createElement("option");
+      e.value = repetitions;
+      e.innerText = repetitions.toString();
+      if (repetitions == DEFAULT_REPETITIONS) {
+        e.selected = true;
+      }
+      this.repetitionsSelect.appendChild(e);
+    }
 
-  const presetsSpan = document.getElementById("presets");
-  for (const preset of presets) {
-    const button = document.createElement("button");
-    presetsSpan.appendChild(button);
-
-    button.countdownDuration = preset.countdownDuration;
-    button.alertDuration = preset.alertDuration;
-    button.pauseDuration = preset.pauseDuration;
-    const descriptor = `${preset.countdownDuration}/${preset.alertDuration}/${preset.pauseDuration}`;
-    button.innerText = `${preset.name} (${descriptor})`;
-    button.addEventListener("click", e => {
-      COUNTDOWN_DURATION_INPUT.value = e.target.countdownDuration;
-      ALERT_DURATION_INPUT.value = e.target.alertDuration;
-      PAUSE_DURATION_INPUT.value = e.target.pauseDuration;
+    this.applyButton.addEventListener("click", e => {
+      const tempo = parseInt(this.tempoSelect.value);
+      const repetitions = parseInt(this.repetitionsSelect.value);
+      const countdownDuration = Math.round(60 / tempo * DEFAULT_RATE * repetitions);
+      this.countdownDurationInput.value = countdownDuration;
+      this.alertDurationInput.value = DEFAULT_ALERT_DURATION;
+      this.pauseDurationInput.value = DEFAULT_PAUSE_DURATION;
     });
+
+    const presetsSpan = document.getElementById("presets");
+    for (const preset of presets) {
+      const button = document.createElement("button");
+      button.countdownDuration = preset.countdownDuration;
+      button.alertDuration = preset.alertDuration;
+      button.pauseDuration = preset.pauseDuration;
+      const descriptor = `${preset.countdownDuration}/${preset.alertDuration}/${preset.pauseDuration}`;
+      button.innerText = `${preset.name} (${descriptor})`;
+      presetsSpan.appendChild(button);
+
+      button.addEventListener("click", e => {
+        this.countdownDurationInput.value = e.target.countdownDuration;
+        this.alertDurationInput.value = e.target.alertDuration;
+        this.pauseDurationInput.value = e.target.pauseDuration;
+      });
+    }
   }
 }
 
@@ -82,7 +86,8 @@ const TimerState = Object.freeze({
 });
 
 class Timer {
-  constructor(countdownDuration, alertDuration, pauseDuration, pauseMessage) {
+  constructor(ui, countdownDuration, alertDuration, pauseDuration, pauseMessage) {
+    this.ui = ui;
     this.countdownDuration = countdownDuration;
     this.alertDuration = alertDuration;
     this.pauseDuration = pauseDuration;
@@ -113,7 +118,7 @@ class Timer {
     this.startTime = null;
     this.state = TimerState.IDLE;
     this.setCountdownClass();
-    COUNTDOWN.innerHTML = "&ndash;&ndash;&ndash;";
+    this.ui.countdownSpan.innerHTML = "&ndash;&ndash;&ndash;";
   }
 
   step() {
@@ -129,7 +134,7 @@ class Timer {
           this.state = TimerState.ALERTING;
           this.setCountdownClass();
         } else {
-          COUNTDOWN.innerHTML = remaining.toFixed(1);
+          this.ui.countdownSpan.innerHTML = remaining.toFixed(1);
         }
         break;
       }
@@ -138,10 +143,10 @@ class Timer {
         if (remaining <= 0) {
           this.state = TimerState.PAUSED;
           this.setCountdownClass();
-          COUNTDOWN.innerHTML = this.pauseMessage;
+          this.ui.countdownSpan.innerHTML = this.pauseMessage;
           this.startTime = Date.now();
         } else {
-          COUNTDOWN.innerHTML = remaining.toFixed(1);
+          this.ui.countdownSpan.innerHTML = remaining.toFixed(1);
         }
         break;
       }
@@ -150,7 +155,7 @@ class Timer {
         if (remaining <= 0) {
           this.state = TimerState.RUNNING;
           this.setCountdownClass();
-          COUNTDOWN.innerHTML = this.countdownDuration.toFixed(1);
+          this.ui.countdownSpan.innerHTML = this.countdownDuration.toFixed(1);
           this.startTime = Date.now();
         }
         break;
@@ -159,47 +164,41 @@ class Timer {
   }
 
   setCountdownClass() {
-    COUNTDOWN.classList.remove("idle", "running", "alerting", "paused");
+    let cls;
     switch (this.state) {
-      case TimerState.IDLE:
-        COUNTDOWN.classList.add("idle");
-        break;
-      case TimerState.RUNNING:
-        COUNTDOWN.classList.add("running");
-        break;
-      case TimerState.ALERTING:
-        COUNTDOWN.classList.add("alerting");
-        break;
-      case TimerState.PAUSED:
-        COUNTDOWN.classList.add("paused");
-        break;
+      case TimerState.IDLE: cls = "idle"; break;
+      case TimerState.RUNNING: cls = "running"; break;
+      case TimerState.ALERTING: cls = "alerting"; break;
+      case TimerState.PAUSED: cls = "paused"; break;
     }
+    this.ui.countdownSpan.classList.remove("idle", "running", "alerting", "paused");
+    this.ui.countdownSpan.classList.add(cls);
   }
 }
 
-const TIMER = new Timer(DEFAULT_COUNTDOWN_DURATION, DEFAULT_ALERT_DURATION, DEFAULT_PAUSE_DURATION, "next");
+const UI = new Ui();
+const TIMER = new Timer(UI, DEFAULT_COUNTDOWN_DURATION, DEFAULT_ALERT_DURATION, DEFAULT_PAUSE_DURATION, "next");
 
-START_BUTTON.addEventListener("click", () => {
-  const countdownDuration = parseInt(COUNTDOWN_DURATION_INPUT.value);
-  const alertDuration = parseInt(ALERT_DURATION_INPUT.value);
-  const pauseDuration = parseInt(PAUSE_DURATION_INPUT.value);
+UI.startButton.addEventListener("click", () => {
+  const countdownDuration = parseInt(UI.countdownDurationInput.value);
+  const alertDuration = parseInt(UI.alertDurationInput.value);
+  const pauseDuration = parseInt(UI.alertDurationInput.value);
   TIMER.start(countdownDuration, alertDuration, pauseDuration);
 });
 
-STOP_BUTTON.addEventListener("click", () => {
+UI.stopButton.addEventListener("click", () => {
   TIMER.stop();
 });
 
 window.onload = () => {
-  COUNTDOWN_DURATION_INPUT.value = DEFAULT_COUNTDOWN_DURATION;
-  ALERT_DURATION_INPUT.value = DEFAULT_ALERT_DURATION;
-  PAUSE_DURATION_INPUT.value = DEFAULT_PAUSE_DURATION;
+  UI.countdownDurationInput.value = DEFAULT_COUNTDOWN_DURATION;
+  UI.alertDurationInput.value = DEFAULT_ALERT_DURATION;
+  UI.pauseDurationInput.value = DEFAULT_PAUSE_DURATION;
 };
 
 fetch("data.json")
   .then(response => response.json())
   .then(data => {
-    const presets = Object.hasOwn(data, "presets") ? data.presets : [];
-    populateSettings("tempo", "repetitions", "apply", presets);
+    UI.populateSettings(Object.hasOwn(data, "presets") ? data.presets : []);
   })
   .catch(e => alert(`Could not parse JSON from server: ${e}\n\nPlease ask Richard to fix this!`));
