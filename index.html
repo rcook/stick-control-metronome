@@ -167,7 +167,54 @@
       this.applyButton = document.getElementById("apply");
     }
 
-    populateSettings(presets) {
+    run(timer) {
+      this.startButton.addEventListener("click", e => {
+        this.startButton.disabled = true;
+        this.stopButton.disabled = false;
+        const countdownDuration = parseInt(this.countdownDurationInput.value);
+        const alertDuration = parseInt(this.alertDurationInput.value);
+        const pauseDuration = parseInt(this.pauseDurationInput.value);
+        timer.start(countdownDuration, alertDuration, pauseDuration);
+      });
+
+      this.stopButton.addEventListener("click", e => {
+        this.startButton.disabled = false;
+        this.stopButton.disabled = true;
+        timer.stop();
+      });
+
+      window.onload = () => {
+        this.countdownDurationInput.value = DEFAULT_COUNTDOWN_DURATION;
+        this.alertDurationInput.value = DEFAULT_ALERT_DURATION;
+        this.pauseDurationInput.value = DEFAULT_PAUSE_DURATION;
+      };
+
+      document.addEventListener("keydown", e => {
+        if (e.key == " ") {
+          if (!this.startButton.disabled) {
+            this.startButton.click()
+          }
+          else if (!this.stopButton.disabled) {
+            this.stopButton.click()
+          }
+        }
+        else if (e.key == "Enter") {
+          this.startButton.click()
+        }
+        else if (e.key == "Escape") {
+          this.stopButton.click()
+        }
+      });
+
+      fetch("data.json")
+        .then(response => response.json())
+        .then(data => {
+          this.#populateSettings(Object.hasOwn(data, "presets") ? data.presets : []);
+        })
+        .catch(e => alert(`Could not parse JSON from server: ${e}\n\nPlease ask Richard to fix this!`));
+    }
+
+    #populateSettings(presets) {
       for (let tempo = 60; tempo <= 200; tempo += 5) {
         const e = document.createElement("option");
         e.value = tempo;
@@ -337,53 +384,10 @@
     }
   }
 
-  const UI = new Ui();
-  const TIMER = new Timer(UI);
-
-  UI.startButton.addEventListener("click", e => {
-    UI.startButton.disabled = true;
-    UI.stopButton.disabled = false;
-    const countdownDuration = parseInt(UI.countdownDurationInput.value);
-    const alertDuration = parseInt(UI.alertDurationInput.value);
-    const pauseDuration = parseInt(UI.pauseDurationInput.value);
-    TIMER.start(countdownDuration, alertDuration, pauseDuration);
-  });
-
-  UI.stopButton.addEventListener("click", e => {
-    UI.startButton.disabled = false;
-    UI.stopButton.disabled = true;
-    TIMER.stop();
-  });
-
-  window.onload = () => {
-    UI.countdownDurationInput.value = DEFAULT_COUNTDOWN_DURATION;
-    UI.alertDurationInput.value = DEFAULT_ALERT_DURATION;
-    UI.pauseDurationInput.value = DEFAULT_PAUSE_DURATION;
-  };
-
-  document.addEventListener("keydown", e => {
-    if (e.key == " ") {
-      if (!UI.startButton.disabled) {
-        UI.startButton.click()
-      }
-      else if (!UI.stopButton.disabled) {
-        UI.stopButton.click()
-      }
-    }
-    else if (e.key == "Enter") {
-      UI.startButton.click()
-    }
-    else if (e.key == "Escape") {
-      UI.stopButton.click()
-    }
-  });
-
-  fetch("data.json")
-    .then(response => response.json())
-    .then(data => {
-      UI.populateSettings(Object.hasOwn(data, "presets") ? data.presets : []);
-    })
-    .catch(e => alert(`Could not parse JSON from server: ${e}\n\nPlease ask Richard to fix this!`));
+  (() => {
+    const ui = new Ui();
+    ui.run(new Timer(ui));
+  })();
   //]]>
 </script>
 
