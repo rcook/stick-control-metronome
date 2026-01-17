@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Stick Control Metronome</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Verdana, Geneva, Tahoma, sans-serif;
+      margin: 0px;
+      display: flex;
+      height: 100vh;
+      align-items: center;
+      background-color: limegreen;
+    }
+
+    #container {
+      width: fit-content;
+      margin: 0 auto;
+    }
+
+    .dots {
+      display: flex;
+      height: 200px;
+    }
+
+    .dots.last {
+      background-color: pink;
+    }
+
+    .dot {
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      border: 5px solid green;
+      display: grid;
+      align-items: center;
+      text-align: center;
+      font-size: 2em;
+      margin: 20px;
+    }
+
+    .current {
+      background-color: lightgreen;
+    }
+
+    #progress-repetitions,
+    #progress-bars {
+      font-size: 5em;
+    }
+
+    #controls {
+      display: flex;
+    }
+
+    #fields {
+      display: inline;
+      border: none;
+    }
+
+    #fields div {
+      display: inline-block;
+    }
+
+    #fields label {
+      display: block;
+    }
+
+    #fields input,
+    #fields select {
+      box-sizing: border-box;
+      vertical-align: top;
+      height: 32px;
+      padding: 5px;
+    }
+
+    #buttons {
+      align-content: center;
+    }
+
+    #buttons button {
+      height: 32px;
+    }
+
+    .last {
+      color: red;
+    }
+
+    #progress-exercise {
+      font-size: 3em;
+    }
+
+    #progress-repetition,
+    #progress-bar {
+      font-size: 2em;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="container">
+    <div id="indicators">
+      <div id="progress-exercise">&ndash;&ndash;&ndash;</div>
+      <div id="progress-repetition">&ndash;&ndash;&ndash;</div>
+      <div id="progress-bar">&ndash;&ndash;&ndash;</div>
+      <div id="dots" class="dots"></div>
+    </div>
+    <div id="controls">
+      <div id="buttons">
+        <button id="start">Start</button>
+        <button id="stop">Stop</button>
+      </div>
+      <fieldset id="fields">
+        <div>
+          <input id="tempo" type="number" min="30" max="250" step="1">
+          <label for="tempo">tempo</label>
+        </div>
+        <div>
+          <input id="exercises" type="number" min="1" max="100" step="1">
+          <label for="exercises">exercises</label>
+        </div>
+        <div>
+          <input id="repetitions" type="number" min="1" max="100" step="1">
+          <label for="repetitions">reps</label>
+        </div>
+        <div>
+          <input id="bars" type="number" min="1" max="4" step="1">
+          <label for="bars">bars</label>
+        </div>
+        <div>
+          <input id="beats" type="number" min="1" max="16" step="1">
+          <label for="beats">beats</label>
+        </div>
+        <div>
+          <select id="subdivisions">
+            <option value="1">&#9833;</option>
+            <option value="2">&#9834;</option>
+            <option value="4">&#119137;</option>
+          </select>
+          <label for="subdivisions">subs</label>
+        </div>
+        <div>
+          <input id="pattern" type="text">
+          <label for="pattern">pattern</label>
+        </div>
+        <div>
+          <input id="preroll-repetitions" type="number" min="1" max="100" step="1">
+          <label for="preroll-repetitions">preroll</label>
+        </div>
+      </fieldset>
+    </div>
+  </div>
+</body>
+<script>
+  //<![CDATA[
+  (() => {
+    const HIGH = "A";
+    const MEDIUM = "B";
+    const LOW = "C";
+    const SILENCE = "D";
+    const DEFAULT_TEMPO = 120;
+    const DEFAULT_EXERCISES = 24;
+    const DEFAULT_REPETITIONS = 20;
+    const DEFAULT_BARS = 2;
+    const DEFAULT_BEATS = 4;
+    const DEFAULT_SUBDIVISIONS = 2;
+    const DEFAULT_PREROLL_REPETITIONS = 1;
+    const HIGH_CLICK = new Audio("click1.mp3");
+    const MEDIUM_CLICK = new Audio("click2.mp3");
+    const LOW_CLICK = new Audio("click3.mp3");
+    const IDLE_HTML = "&ndash;&ndash;&ndash;";
+
+    function formatProgress(name, value, count) {
+      return `${name} ${value + 1} of ${count}`;
+    }
+
+    class Metronome {
+      constructor(options) {
+        this.beats = options.beats;
+        this.subdivisions = options.subdivisions;
+        this.tempo = options.tempo;
+        this.pattern = options.pattern;
+        this.exercises = options.exercises;
+        this.repetitions = options.repetitions;
+        this.prerollRepetitions = options.prerollRepetitions;
+        this.bars = options.bars;
+        this.highClick = options.highClick;
+        this.mediumClick = options.mediumClick;
+        this.lowClick = options.lowClick;
+        this.progressExerciseDiv = options.progressExerciseDiv;
+        this.progressRepetitionDiv = options.progressRepetitionDiv;
+        this.progressBarDiv = options.progressBarDiv;
+        this.dotsDiv = options.dotsDiv;
+        this.onStop = options.onStop;
+        this.interval = 60 / (this.tempo * this.subdivisions) * 1000;
+        this.time = null;
+        this.intervalId = null;
+        this.currentExercise = -2; // preroll
+        this.currentRepetition = -1;
+        this.currentBar = -1;
+        this.currentStep = -1;
+
+        this.dotsDiv.replaceChildren();
+        for (let i = 0; i < this.beats; ++i) {
+          const e = document.createElement("div");
+          e.classList.add("dot");
+          this.dotsDiv.appendChild(e);
+        }
+      }
+
+      start() {
+        if (this.intervalId) { return; }
+        this.time = Date.now();
+        this.#step();
+        this.intervalId = setInterval(() => this.#step(), 10);
+      }
+
+      stop() {
+        clearInterval(this.intervalId);
+        this.intervalId = null;
+        this.time = null;
+      }
+
+      #step() {
+        const now = Date.now();
+        const elapsed = now - this.time;
+        if (elapsed < this.interval) { return; }
+        this.time = now;
+
+        const isPreroll = this.currentExercise < 0;
+
+        this.currentStep = (this.currentStep + 1) % this.pattern.length;
+        if (this.currentStep == 0) {
+          this.currentBar = (this.currentBar + 1) % this.bars;
+          this.progressBarDiv.innerHTML = formatProgress("bar", this.currentBar, this.bars);
+
+          if (this.currentBar == 0) {
+            const repetitions = isPreroll ? this.prerollRepetitions : this.repetitions;
+
+            this.currentRepetition = (this.currentRepetition + 1) % repetitions;
+            this.#updateRepetition(repetitions);
+
+            if (this.currentRepetition == 0) {
+              ++this.currentExercise;
+              if (this.currentExercise == this.exercises) {
+                clearInterval(this.intervalId);
+                this.intervalId = null;
+                this.progressExerciseDiv.innerHTML = IDLE_HTML;
+                this.progressRepetitionDiv.innerHTML = IDLE_HTML;
+                this.progressBarDiv.innerHTML = IDLE_HTML;
+                this.dotsDiv.innerHTML = null;
+                if (this.onStop) { this.onStop(); }
+                return;
+              }
+
+              const isPrerollNow = this.currentExercise < 0;
+              if (isPrerollNow) {
+                this.progressExerciseDiv.innerHTML = "preroll";
+              } else {
+                this.progressExerciseDiv.innerHTML = formatProgress("exercise", this.currentExercise, this.exercises);
+                if (isPreroll) {
+                  this.#updateRepetition(this.repetitions);
+                  this.progressBarDiv.innerHTML = formatProgress("bar", this.currentBar, this.bars);
+                }
+              }
+            }
+          }
+        }
+
+        this.#render()
+      }
+
+      #updateRepetition(repetitions) {
+        this.progressRepetitionDiv.innerHTML = formatProgress("rep", this.currentRepetition, repetitions);
+        const lastRepetition = this.currentRepetition == repetitions - 1;
+        if (lastRepetition) {
+          this.progressRepetitionDiv.classList.add("last");
+          this.dotsDiv.classList.add("last");
+        } else {
+          this.progressRepetitionDiv.classList.remove("last");
+          this.dotsDiv.classList.remove("last");
+        }
+      }
+
+      #render() {
+        const currentBeat = Math.trunc(this.currentStep / this.subdivisions);
+        [...this.dotsDiv.children].forEach((e, i) => {
+          if (i == currentBeat) {
+            e.classList.add("current");
+            e.innerHTML = (i + 1).toString();
+          } else {
+            e.classList.remove("current");
+            e.innerHTML = null;
+          }
+        });
+
+
+        let click;
+        switch (this.pattern[this.currentStep]) {
+          case HIGH: click = this.highClick; break;
+          case MEDIUM: click = this.mediumClick; break;
+          case LOW: click = this.lowClick; break;
+          default: click = null; break;
+        }
+        if (click) {
+          click.play();
+        }
+      }
+    }
+
+    function makeDefaultPattern(beats, subdivisions) {
+      let pattern = "";
+      for (let i = 0; i < beats; ++i) {
+        if (i == 0) {
+          pattern += HIGH;
+        } else {
+          pattern += MEDIUM;
+        }
+
+        for (let j = 0; j < subdivisions - 1; ++j) {
+          pattern += LOW;
+        }
+      }
+
+      console.assert(pattern.length == beats * subdivisions);
+      return pattern;
+    }
+
+    function parsePattern(s, beats, subdivisions) {
+      const len = beats * subdivisions;
+      return s.substring(0, len).padEnd(len, "D");
+    }
+
+    function main() {
+      function setIdle() {
+        metronome = null;
+        progressExerciseDiv.innerHTML = IDLE_HTML;
+        progressRepetitionDiv.innerHTML = IDLE_HTML;
+        progressRepetitionDiv.classList.remove("last");
+        progressBarDiv.innerHTML = IDLE_HTML;
+        dotsDiv.innerHTML = null;
+        dotsDiv.classList.remove("last");
+        fields.disabled = false;
+        startBtn.disabled = false;
+      }
+
+      const progressExerciseDiv = document.getElementById("progress-exercise");
+      const progressRepetitionDiv = document.getElementById("progress-repetition");
+      const progressBarDiv = document.getElementById("progress-bar");
+      const dotsDiv = document.getElementById("dots");
+      const startBtn = document.getElementById("start");
+      const stopBtn = document.getElementById("stop");
+      const fields = document.getElementById("fields");
+      const tempoInput = document.getElementById("tempo");
+      const exercisesInput = document.getElementById("exercises");
+      const repetitionsInput = document.getElementById("repetitions");
+      const barsInput = document.getElementById("bars");
+      const beatsInput = document.getElementById("beats");
+      const subdivisionsSelect = document.getElementById("subdivisions");
+      const patternInput = document.getElementById("pattern");
+      const prerollRepetitionsInput = document.getElementById("preroll-repetitions");
+
+      tempoInput.value = DEFAULT_TEMPO;
+      exercisesInput.value = DEFAULT_EXERCISES;
+      repetitionsInput.value = DEFAULT_REPETITIONS;
+      barsInput.value = DEFAULT_BARS;
+      beatsInput.value = DEFAULT_BEATS;
+      subdivisionsSelect.value = DEFAULT_SUBDIVISIONS;
+      patternInput.value = makeDefaultPattern(DEFAULT_BEATS, DEFAULT_SUBDIVISIONS);
+      prerollRepetitionsInput.value = DEFAULT_PREROLL_REPETITIONS;
+
+      let metronome = null;
+
+      document.addEventListener("keydown", e => {
+        if (e.key == " ") {
+          if (!startBtn.disabled) {
+            startBtn.click()
+          }
+          else if (!stopBtn.disabled) {
+            stopBtn.click()
+          }
+        }
+        else if (e.key == "Enter") {
+          startBtn.click()
+        }
+        else if (e.key == "Escape") {
+          stopBtn.click()
+        }
+      });
+
+      tempoInput.addEventListener("keydown", e => {
+        if (e.key == "e") {
+          e.preventDefault();
+        }
+      })
+
+      beatsInput.addEventListener("keydown", e => {
+        if (e.key == "e") {
+          e.preventDefault();
+        }
+      })
+
+      beatsInput.addEventListener("input", e => {
+        if (!e.target.validity.valid) { return; }
+        const beats = e.target.valueAsNumber;
+        if (Number.isNaN(beats)) { return; }
+
+        if (!subdivisionsSelect.validity.valid) { return; }
+        const subdivisions = parseInt(subdivisionsSelect.value);
+        if (Number.isNaN(subdivisions)) { return; }
+
+        patternInput.value = makeDefaultPattern(beats, subdivisions);
+      });
+
+      subdivisionsSelect.addEventListener("input", e => {
+        if (!e.target.validity.valid) { return; }
+        const subdivisions = parseInt(e.target.value);
+        if (Number.isNaN(subdivisions)) { return; }
+
+        if (!beatsInput.validity.valid) { return; }
+        const beats = beatsInput.valueAsNumber;
+        if (Number.isNaN(beats)) { return; }
+
+        patternInput.value = makeDefaultPattern(beats, subdivisions);
+      });
+
+      startBtn.addEventListener("click", e => {
+        fields.disabled = true;
+        e.target.disabled = true;
+        if (metronome) { return; }
+        const exercises = exercisesInput.valueAsNumber;
+        const repetitions = repetitionsInput.valueAsNumber;
+        const bars = barsInput.valueAsNumber;
+        const beats = beatsInput.valueAsNumber;
+        const subdivisions = parseInt(subdivisionsSelect.value);
+        const tempo = tempoInput.valueAsNumber;
+        const pattern = parsePattern(patternInput.value, beats, subdivisions);
+        const prerollRepetitions = prerollRepetitionsInput.valueAsNumber;
+        metronome = new Metronome({
+          beats: beats,
+          subdivisions: subdivisions,
+          tempo: tempo,
+          pattern: pattern,
+          exercises: exercises,
+          repetitions: repetitions,
+          prerollRepetitions: prerollRepetitions,
+          bars: bars,
+          highClick: HIGH_CLICK,
+          mediumClick: MEDIUM_CLICK,
+          lowClick: LOW_CLICK,
+          progressExerciseDiv: progressExerciseDiv,
+          progressRepetitionDiv: progressRepetitionDiv,
+          progressBarDiv: progressBarDiv,
+          dotsDiv: dotsDiv,
+          onStop: setIdle,
+        });
+        metronome.start();
+        stopBtn.disabled = false;
+      });
+
+
+      stopBtn.addEventListener("click", e => {
+        e.target.disabled = true;
+        if (!metronome) { return; }
+        metronome.stop()
+        setIdle();
+      });
+    }
+
+
+    const readyPromises = [HIGH_CLICK, MEDIUM_CLICK, LOW_CLICK].map(e =>
+      new Promise(resolve => {
+        if (e.readyState >= 4) {
+          resolve();
+        } else {
+          e.addEventListener("canplaythrough", () => resolve(), { once: true });
+        }
+      })
+    );
+
+    Promise.all(readyPromises).then(e => main())
+
+  })();
+  //]]>
+</script>
+
+</html>
