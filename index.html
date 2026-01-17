@@ -20,6 +20,10 @@
       opacity: 50%;
     }
 
+    .transport {
+      min-width: 150px;
+    }
+
     #container {
       display: grid;
       grid-template-columns: 1fr;
@@ -104,8 +108,8 @@
     <div id="context" class="cell">&ndash;&ndash;&ndash;</div>
     <div id="time" class="cell idle">&ndash;&ndash;&ndash;</div>
     <div id="controls" class="cell">
-      <button id="start">Start</button>
-      <button id="stop" disabled>Stop</button>
+      <button id="start" class="transport">&#9654;</button>
+      <button id="stop" class="transport" disabled>&#9209;</button>
     </div>
     <div id="settings" class="cell">
       <div id="values">
