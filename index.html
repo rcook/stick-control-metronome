@@ -130,9 +130,9 @@
 
 <script type="text/javascript">
   //<![CDATA[
-  const DEFAULT_COUNTDOWN_DURATION = 5;//120;
-  const DEFAULT_ALERT_DURATION = 2;//10;
-  const DEFAULT_PAUSE_DURATION = 2;//5;
+  const DEFAULT_COUNTDOWN_DURATION = 120;
+  const DEFAULT_ALERT_DURATION = 10;
+  const DEFAULT_PAUSE_DURATION = 5;
   const DEFAULT_TEMPO = 100;
   const DEFAULT_REPETITIONS = 20;
   const DEFAULT_RATE = 8;
@@ -355,6 +355,17 @@
     UI.alertDurationInput.value = DEFAULT_ALERT_DURATION;
     UI.pauseDurationInput.value = DEFAULT_PAUSE_DURATION;
   };
+
+  document.addEventListener("keydown", e => {
+    if (e.key == " ") {
+      if (!UI.startButton.disabled) {
+        UI.startButton.click()
+      }
+      else if (!UI.stopButton.disabled) {
+        UI.stopButton.click()
+      }
+    }
+  });
 
   fetch("data.json")
     .then(response => response.json())
