@@ -31,8 +31,8 @@
     }
 
     .dot {
-      width: 150px;
-      height: 150px;
+      width: 125px;
+      height: 125px;
       border-radius: 50%;
       border: 5px solid green;
       display: grid;
@@ -40,10 +40,12 @@
       text-align: center;
       font-size: 2em;
       margin: 20px;
+      color: lime;
     }
 
     .current {
       background-color: lightgreen;
+      color: darkgreen;
     }
 
     #progress-repetitions,
@@ -109,8 +111,7 @@
     </div>
     <div id="controls">
       <div id="buttons">
-        <button id="start">Start</button>
-        <button id="stop">Stop</button>
+        <button id="start-stop">Start</button>
       </div>
       <fieldset id="fields">
         <div>
@@ -146,342 +147,434 @@
           <label for="pattern">pattern</label>
         </div>
         <div>
-          <input id="preroll-repetitions" type="number" min="1" max="100" step="1">
-          <label for="preroll-repetitions">preroll</label>
+          <input id="preroll-bars" type="number" min="1" max="100" step="1">
+          <label for="preroll-bars">preroll</label>
         </div>
       </fieldset>
     </div>
   </div>
 </body>
+
 <script>
   //<![CDATA[
-  (() => {
-    const HIGH = "A";
-    const MEDIUM = "B";
-    const LOW = "C";
-    const SILENCE = "D";
-    const DEFAULT_TEMPO = 120;
-    const DEFAULT_EXERCISES = 24;
-    const DEFAULT_REPETITIONS = 20;
-    const DEFAULT_BARS = 2;
-    const DEFAULT_BEATS = 4;
-    const DEFAULT_SUBDIVISIONS = 2;
-    const DEFAULT_PREROLL_REPETITIONS = 1;
-    const HIGH_CLICK = new Audio("click1.mp3");
-    const MEDIUM_CLICK = new Audio("click2.mp3");
-    const LOW_CLICK = new Audio("click3.mp3");
-    const IDLE_HTML = "&ndash;&ndash;&ndash;";
+  const HIGH = "A";
+  const MEDIUM = "B";
+  const LOW = "C";
+  const SILENT = "D";
+  const HIGH_FREQUENCY = 880;
+  const MEDIUM_FREQUENCY = 440;
+  const LOW_FREQUENCY = 220;
+  const BEEP_DURATION = 0.1;
 
-    function formatProgress(name, value, count) {
-      return `${name} ${value + 1} of ${count}`;
+  const DEFAULT_TEMPO = 120;
+  const DEFAULT_EXERCISES = 24;
+  const DEFAULT_REPETITIONS = 20;
+  const DEFAULT_BARS = 2;
+  const DEFAULT_BEATS = 4;
+  const DEFAULT_SUBDIVISIONS = 2;
+  const DEFAULT_PREROLL_BARS = 2;
+
+  const IDLE_HTML = "&ndash;&ndash;&ndash;";
+
+  function makeDefaultPattern(beats, subdivisions) {
+    let pattern = "";
+    for (let i = 0; i < beats; ++i) {
+      if (i == 0) {
+        pattern += HIGH;
+      } else {
+        pattern += MEDIUM;
+      }
+
+      for (let j = 0; j < subdivisions - 1; ++j) {
+        pattern += LOW;
+      }
     }
 
-    class Metronome {
-      constructor(options) {
-        this.beats = options.beats;
-        this.subdivisions = options.subdivisions;
-        this.tempo = options.tempo;
-        this.pattern = options.pattern;
-        this.exercises = options.exercises;
-        this.repetitions = options.repetitions;
-        this.prerollRepetitions = options.prerollRepetitions;
-        this.bars = options.bars;
-        this.highClick = options.highClick;
-        this.mediumClick = options.mediumClick;
-        this.lowClick = options.lowClick;
-        this.progressExerciseDiv = options.progressExerciseDiv;
-        this.progressRepetitionDiv = options.progressRepetitionDiv;
-        this.progressBarDiv = options.progressBarDiv;
-        this.dotsDiv = options.dotsDiv;
-        this.onStop = options.onStop;
-        this.interval = 60 / (this.tempo * this.subdivisions) * 1000;
-        this.time = null;
-        this.intervalId = null;
-        this.currentExercise = -2; // preroll
-        this.currentRepetition = -1;
-        this.currentBar = -1;
-        this.currentStep = -1;
+    console.assert(pattern.length == beats * subdivisions);
+    return pattern;
+  }
 
+  function parsePattern(s, beats, subdivisions) {
+    const len = beats * subdivisions;
+    return s.substring(0, len).padEnd(len, "D");
+  }
+
+  function formatProgress(name, value, count) {
+    return `${name} ${value + 1} of ${count}`;
+  }
+
+  class Queue {
+    constructor() {
+      this.notes = [];
+    }
+
+    isEmpty() {
+      return this.notes.length == 0;
+    }
+
+    enqueue(note) {
+      this.notes.push(note);
+    }
+
+    dequeue() {
+      if (this.isEmpty()) {
+        return null;
+      }
+
+      return this.notes.shift();
+    }
+
+    peek() {
+      if (this.isEmpty()) {
+        return null;
+      }
+      return this.notes[0];
+    }
+
+    clear() {
+      this.notes.length = 0;
+    }
+  }
+
+  class Beeper {
+    constructor(options) {
+      this.audioCtx = options.audioCtx;
+      this.tempo = options.tempo;
+      this.beats = options.beats;
+      this.subdivisions = options.subdivisions;
+      this.pattern = options.pattern;
+      this.queue = options.queue;
+      this.interval = Object.hasOwn(options, "interval") ? options.interval : 30;
+      this.lookahead = Object.hasOwn(options, "lookahead") ? options.lookahead : 0.1;
+      this.stepInterval = 60 / this.tempo / this.subdivisions;
+      this.nextStepTime = null;
+      this.step = null;
+      this.intervalId = null;
+      this.currentBar = null;
+    }
+
+    start() {
+      this.stop();
+      this.nextStepTime = this.audioCtx.currentTime;
+      this.step = 0;
+      this.intervalId = setInterval(() => { this.#scheduleBeeps() }, this.interval);
+      this.currentBar = 0;
+    }
+
+    stop() {
+      if (this.intervalId) {
+        clearInterval(this.intervalId);
+        this.intervalId = null;
+      }
+    }
+
+    #scheduleBeeps() {
+      while (this.nextStepTime < this.audioCtx.currentTime + this.lookahead) {
+        this.#scheduleBeep();
+        this.nextStepTime += this.stepInterval;
+        this.step = (this.step + 1) % this.pattern.length;
+        if (this.step == 0) {
+          ++this.currentBar;
+        }
+      }
+    }
+
+    #scheduleBeep() {
+      if (this.step % this.subdivisions == 0) {
+        const beat = Math.trunc(this.step / this.subdivisions);
+        this.queue.enqueue({
+          beat: beat,
+          beats: this.beats,
+          time: this.nextStepTime,
+          currentBar: this.currentBar
+        });
+      }
+
+      const frequency = this.#stepFrequency();
+      if (frequency) {
+        const startTime = this.nextStepTime;
+        const endTime = startTime + BEEP_DURATION;
+
+        const oscillator = this.audioCtx.createOscillator();
+        oscillator.type = "sawtooth";
+        oscillator.frequency.value = frequency;
+        oscillator.start(startTime);
+        oscillator.stop(endTime);
+
+        const gain = this.audioCtx.createGain();
+        gain.gain.setValueAtTime(1, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.1, endTime);
+
+        oscillator.connect(gain);
+        gain.connect(this.audioCtx.destination);
+      }
+    }
+
+    #stepFrequency() {
+      switch (this.pattern[this.step]) {
+        case HIGH: return HIGH_FREQUENCY;
+        case MEDIUM: return MEDIUM_FREQUENCY;
+        case LOW: return LOW_FREQUENCY;
+        case HIGH: return null;
+      }
+    }
+  }
+
+  class Visualizer {
+    constructor(options) {
+      this.id = options.id;
+      this.audioCtx = options.audioCtx;
+      this.queue = options.queue;
+      this.progressExerciseDiv = options.progressExerciseDiv;
+      this.progressRepetitionDiv = options.progressRepetitionDiv;
+      this.progressBarDiv = options.progressBarDiv;
+      this.dotsDiv = options.dotsDiv;
+      this.exercises = options.exercises;
+      this.repetitions = options.repetitions;
+      this.bars = options.bars;
+      this.prerollBars = options.prerollBars;
+      this.onFinished = options.onFinished;
+      this.requestIds = [];
+      this.beats = null;
+
+      this.progressExerciseDiv.innerHTML = IDLE_HTML;
+      this.progressRepetitionDiv.innerHTML = IDLE_HTML;
+      this.progressBarDiv.innerHTML = IDLE_HTML;
+      this.dotsDiv.replaceChildren();
+    }
+
+    start() {
+      this.requestIds.push(window.requestAnimationFrame(() => this.#refresh()));
+    }
+
+    stop() {
+      while (this.requestIds.length > 0) {
+        const requestId = this.requestIds.pop();
+        window.cancelAnimationFrame(requestId);
+      }
+    }
+
+    #refresh() {
+      const note = this.#nextNote();
+      if (note) {
+        if (!this.#update(note)) { return; }
+      }
+      this.requestIds.push(window.requestAnimationFrame(() => this.#refresh()));
+    }
+
+    #nextNote() {
+      const time = this.audioCtx.currentTime;
+      const note = this.queue.peek();
+      if (!note || note.time > time) { return null; }
+      return this.queue.dequeue();
+    }
+
+    #update(note) {
+      if (note.beats != this.beats) {
+        this.beats = note.beats;
         this.dotsDiv.replaceChildren();
         for (let i = 0; i < this.beats; ++i) {
           const e = document.createElement("div");
+          e.innerHTML = (i + 1).toString();
           e.classList.add("dot");
           this.dotsDiv.appendChild(e);
         }
       }
 
-      start() {
-        if (this.intervalId) { return; }
-        this.time = Date.now();
-        this.#step();
-        this.intervalId = setInterval(() => this.#step(), 10);
-      }
-
-      stop() {
-        clearInterval(this.intervalId);
-        this.intervalId = null;
-        this.time = null;
-      }
-
-      #step() {
-        const now = Date.now();
-        const elapsed = now - this.time;
-        if (elapsed < this.interval) { return; }
-        this.time = now;
-
-        const isPreroll = this.currentExercise < 0;
-
-        this.currentStep = (this.currentStep + 1) % this.pattern.length;
-        if (this.currentStep == 0) {
-          this.currentBar = (this.currentBar + 1) % this.bars;
-          this.progressBarDiv.innerHTML = formatProgress("bar", this.currentBar, this.bars);
-
-          if (this.currentBar == 0) {
-            const repetitions = isPreroll ? this.prerollRepetitions : this.repetitions;
-
-            this.currentRepetition = (this.currentRepetition + 1) % repetitions;
-            this.#updateRepetition(repetitions);
-
-            if (this.currentRepetition == 0) {
-              ++this.currentExercise;
-              if (this.currentExercise == this.exercises) {
-                clearInterval(this.intervalId);
-                this.intervalId = null;
-                this.progressExerciseDiv.innerHTML = IDLE_HTML;
-                this.progressRepetitionDiv.innerHTML = IDLE_HTML;
-                this.progressBarDiv.innerHTML = IDLE_HTML;
-                this.dotsDiv.innerHTML = null;
-                if (this.onStop) { this.onStop(); }
-                return;
-              }
-
-              const isPrerollNow = this.currentExercise < 0;
-              if (isPrerollNow) {
-                this.progressExerciseDiv.innerHTML = "preroll";
-              } else {
-                this.progressExerciseDiv.innerHTML = formatProgress("exercise", this.currentExercise, this.exercises);
-                if (isPreroll) {
-                  this.#updateRepetition(this.repetitions);
-                  this.progressBarDiv.innerHTML = formatProgress("bar", this.currentBar, this.bars);
-                }
-              }
-            }
-          }
-        }
-
-        this.#render()
-      }
-
-      #updateRepetition(repetitions) {
-        this.progressRepetitionDiv.innerHTML = formatProgress("rep", this.currentRepetition, repetitions);
-        const lastRepetition = this.currentRepetition == repetitions - 1;
-        if (lastRepetition) {
-          this.progressRepetitionDiv.classList.add("last");
-          this.dotsDiv.classList.add("last");
+      [...this.dotsDiv.children].forEach((e, i) => {
+        if (i == note.beat) {
+          e.classList.add("current");
         } else {
-          this.progressRepetitionDiv.classList.remove("last");
-          this.dotsDiv.classList.remove("last");
-        }
-      }
-
-      #render() {
-        const currentBeat = Math.trunc(this.currentStep / this.subdivisions);
-        [...this.dotsDiv.children].forEach((e, i) => {
-          if (i == currentBeat) {
-            e.classList.add("current");
-            e.innerHTML = (i + 1).toString();
-          } else {
-            e.classList.remove("current");
-            e.innerHTML = null;
-          }
-        });
-
-
-        let click;
-        switch (this.pattern[this.currentStep]) {
-          case HIGH: click = this.highClick; break;
-          case MEDIUM: click = this.mediumClick; break;
-          case LOW: click = this.lowClick; break;
-          default: click = null; break;
-        }
-        if (click) {
-          click.play();
-        }
-      }
-    }
-
-    function makeDefaultPattern(beats, subdivisions) {
-      let pattern = "";
-      for (let i = 0; i < beats; ++i) {
-        if (i == 0) {
-          pattern += HIGH;
-        } else {
-          pattern += MEDIUM;
-        }
-
-        for (let j = 0; j < subdivisions - 1; ++j) {
-          pattern += LOW;
-        }
-      }
-
-      console.assert(pattern.length == beats * subdivisions);
-      return pattern;
-    }
-
-    function parsePattern(s, beats, subdivisions) {
-      const len = beats * subdivisions;
-      return s.substring(0, len).padEnd(len, "D");
-    }
-
-    function main() {
-      function setIdle() {
-        metronome = null;
-        progressExerciseDiv.innerHTML = IDLE_HTML;
-        progressRepetitionDiv.innerHTML = IDLE_HTML;
-        progressRepetitionDiv.classList.remove("last");
-        progressBarDiv.innerHTML = IDLE_HTML;
-        dotsDiv.innerHTML = null;
-        dotsDiv.classList.remove("last");
-        fields.disabled = false;
-        startBtn.disabled = false;
-      }
-
-      const progressExerciseDiv = document.getElementById("progress-exercise");
-      const progressRepetitionDiv = document.getElementById("progress-repetition");
-      const progressBarDiv = document.getElementById("progress-bar");
-      const dotsDiv = document.getElementById("dots");
-      const startBtn = document.getElementById("start");
-      const stopBtn = document.getElementById("stop");
-      const fields = document.getElementById("fields");
-      const tempoInput = document.getElementById("tempo");
-      const exercisesInput = document.getElementById("exercises");
-      const repetitionsInput = document.getElementById("repetitions");
-      const barsInput = document.getElementById("bars");
-      const beatsInput = document.getElementById("beats");
-      const subdivisionsSelect = document.getElementById("subdivisions");
-      const patternInput = document.getElementById("pattern");
-      const prerollRepetitionsInput = document.getElementById("preroll-repetitions");
-
-      tempoInput.value = DEFAULT_TEMPO;
-      exercisesInput.value = DEFAULT_EXERCISES;
-      repetitionsInput.value = DEFAULT_REPETITIONS;
-      barsInput.value = DEFAULT_BARS;
-      beatsInput.value = DEFAULT_BEATS;
-      subdivisionsSelect.value = DEFAULT_SUBDIVISIONS;
-      patternInput.value = makeDefaultPattern(DEFAULT_BEATS, DEFAULT_SUBDIVISIONS);
-      prerollRepetitionsInput.value = DEFAULT_PREROLL_REPETITIONS;
-
-      let metronome = null;
-
-      document.addEventListener("keydown", e => {
-        if (e.key == " ") {
-          if (!startBtn.disabled) {
-            startBtn.click()
-          }
-          else if (!stopBtn.disabled) {
-            stopBtn.click()
-          }
-        }
-        else if (e.key == "Enter") {
-          startBtn.click()
-        }
-        else if (e.key == "Escape") {
-          stopBtn.click()
+          e.classList.remove("current");
         }
       });
 
-      tempoInput.addEventListener("keydown", e => {
+      let isLastBarOfRepetition;
+      if (note.currentBar < this.prerollBars) {
+        isLastBarOfRepetition = note.currentBar == this.prerollBars - 1;
+        this.progressExerciseDiv.innerHTML = "preroll";
+        this.progressRepetitionDiv.innerHTML = IDLE_HTML;
+        this.progressBarDiv.innerHTML = formatProgress("bar", note.currentBar, this.prerollBars);
+      } else {
+        const overallBar = note.currentBar - this.prerollBars;
+        const barsInExercise = this.bars * this.repetitions;
+        const exercise = Math.trunc(overallBar / barsInExercise);
+        const rem = overallBar % barsInExercise;
+        const repetition = Math.trunc(rem / this.bars);
+        const bar = rem % this.bars;
+        isLastBarOfRepetition = repetition == this.repetitions - 1 && bar == this.bars - 1;
+        const isFinished = exercise >= this.exercises;
+        if (isFinished) {
+          this.requestId = null;
+          this.onFinished();
+          return false;
+        }
+        this.progressExerciseDiv.innerHTML = formatProgress("exercise", exercise, this.exercises);
+        this.progressRepetitionDiv.innerHTML = formatProgress("rep", repetition, this.repetitions);
+        this.progressBarDiv.innerHTML = formatProgress("bar", bar, this.bars);
+      }
+
+      if (isLastBarOfRepetition) {
+        this.progressExerciseDiv.classList.add("last");
+        this.progressRepetitionDiv.classList.add("last");
+        this.progressBarDiv.classList.add("last");
+        this.dotsDiv.classList.add("last");
+      } else {
+        this.progressExerciseDiv.classList.remove("last");
+        this.progressRepetitionDiv.classList.remove("last");
+        this.progressBarDiv.classList.remove("last");
+        this.dotsDiv.classList.remove("last");
+      }
+
+      return true;
+    }
+  }
+
+  (() => {
+    const progressExerciseDiv = document.getElementById("progress-exercise");
+    const progressRepetitionDiv = document.getElementById("progress-repetition");
+    const progressBarDiv = document.getElementById("progress-bar");
+    const dotsDiv = document.getElementById("dots");
+    const startStopBtn = document.getElementById("start-stop");
+    const fields = document.getElementById("fields");
+    const tempoInput = document.getElementById("tempo");
+    const exercisesInput = document.getElementById("exercises");
+    const repetitionsInput = document.getElementById("repetitions");
+    const barsInput = document.getElementById("bars");
+    const beatsInput = document.getElementById("beats");
+    const subdivisionsSelect = document.getElementById("subdivisions");
+    const patternInput = document.getElementById("pattern");
+    const prerollBarsInput = document.getElementById("preroll-bars");
+
+    tempoInput.value = DEFAULT_TEMPO;
+    exercisesInput.value = DEFAULT_EXERCISES;
+    repetitionsInput.value = DEFAULT_REPETITIONS;
+    barsInput.value = DEFAULT_BARS;
+    beatsInput.value = DEFAULT_BEATS;
+    subdivisionsSelect.value = DEFAULT_SUBDIVISIONS;
+    patternInput.value = makeDefaultPattern(DEFAULT_BEATS, DEFAULT_SUBDIVISIONS);
+    prerollBarsInput.value = DEFAULT_PREROLL_BARS;
+
+    for (const input of [tempoInput, exercisesInput, repetitionsInput, barsInput, beatsInput, prerollBarsInput]) {
+      input.addEventListener("keydown", e => {
         if (e.key == "e") {
           e.preventDefault();
         }
       })
+    }
 
-      beatsInput.addEventListener("keydown", e => {
-        if (e.key == "e") {
-          e.preventDefault();
-        }
-      })
+    beatsInput.addEventListener("input", e => {
+      if (!e.target.validity.valid) { return; }
+      const beats = e.target.valueAsNumber;
+      if (Number.isNaN(beats)) { return; }
 
-      beatsInput.addEventListener("input", e => {
-        if (!e.target.validity.valid) { return; }
-        const beats = e.target.valueAsNumber;
-        if (Number.isNaN(beats)) { return; }
+      if (!subdivisionsSelect.validity.valid) { return; }
+      const subdivisions = parseInt(subdivisionsSelect.value);
+      if (Number.isNaN(subdivisions)) { return; }
 
-        if (!subdivisionsSelect.validity.valid) { return; }
-        const subdivisions = parseInt(subdivisionsSelect.value);
-        if (Number.isNaN(subdivisions)) { return; }
+      patternInput.value = makeDefaultPattern(beats, subdivisions);
+    });
 
-        patternInput.value = makeDefaultPattern(beats, subdivisions);
-      });
+    subdivisionsSelect.addEventListener("input", e => {
+      if (!e.target.validity.valid) { return; }
+      const subdivisions = parseInt(e.target.value);
+      if (Number.isNaN(subdivisions)) { return; }
 
-      subdivisionsSelect.addEventListener("input", e => {
-        if (!e.target.validity.valid) { return; }
-        const subdivisions = parseInt(e.target.value);
-        if (Number.isNaN(subdivisions)) { return; }
+      if (!beatsInput.validity.valid) { return; }
+      const beats = beatsInput.valueAsNumber;
+      if (Number.isNaN(beats)) { return; }
 
-        if (!beatsInput.validity.valid) { return; }
-        const beats = beatsInput.valueAsNumber;
-        if (Number.isNaN(beats)) { return; }
+      patternInput.value = makeDefaultPattern(beats, subdivisions);
+    });
 
-        patternInput.value = makeDefaultPattern(beats, subdivisions);
-      });
+    let visualizerId = 0;
 
-      startBtn.addEventListener("click", e => {
+    const audioCtx = new AudioContext();
+    const queue = new Queue();
+    let beeper = null;
+    let visualizer = null;
+
+    function setIdle() {
+      if (beeper) {
+        beeper.stop();
+        beeper = null;
+      }
+
+      if (visualizer) {
+        visualizer.stop();
+        visualizer = null;
+      }
+
+      queue.clear();
+
+      progressExerciseDiv.classList.remove("last");
+      progressRepetitionDiv.classList.remove("last");
+      progressBarDiv.classList.remove("last");
+      dotsDiv.classList.remove("last");
+      progressExerciseDiv.innerHTML = IDLE_HTML;
+      progressRepetitionDiv.innerHTML = IDLE_HTML;
+      progressBarDiv.innerHTML = IDLE_HTML;
+      dotsDiv.replaceChildren();
+
+      startStopBtn.textContent = "Start";
+      fields.disabled = false;
+    }
+
+    startStopBtn.addEventListener("click", e => {
+      if (e.target.textContent == "Start") {
+        console.assert(!visualizer && !beeper);
+        e.target.textContent = "Stop";
         fields.disabled = true;
-        e.target.disabled = true;
-        if (metronome) { return; }
+
+        const tempo = tempoInput.valueAsNumber;
         const exercises = exercisesInput.valueAsNumber;
         const repetitions = repetitionsInput.valueAsNumber;
         const bars = barsInput.valueAsNumber;
         const beats = beatsInput.valueAsNumber;
         const subdivisions = parseInt(subdivisionsSelect.value);
-        const tempo = tempoInput.valueAsNumber;
         const pattern = parsePattern(patternInput.value, beats, subdivisions);
-        const prerollRepetitions = prerollRepetitionsInput.valueAsNumber;
-        metronome = new Metronome({
+        const prerollBars = prerollBarsInput.valueAsNumber;
+
+        beeper = new Beeper({
+          audioCtx: audioCtx,
+          tempo: tempo,
           beats: beats,
           subdivisions: subdivisions,
-          tempo: tempo,
           pattern: pattern,
-          exercises: exercises,
-          repetitions: repetitions,
-          prerollRepetitions: prerollRepetitions,
-          bars: bars,
-          highClick: HIGH_CLICK,
-          mediumClick: MEDIUM_CLICK,
-          lowClick: LOW_CLICK,
+          queue: queue
+        });
+
+        visualizer = new Visualizer({
+          id: ++visualizerId,
+          audioCtx: audioCtx,
+          queue: queue,
           progressExerciseDiv: progressExerciseDiv,
           progressRepetitionDiv: progressRepetitionDiv,
           progressBarDiv: progressBarDiv,
           dotsDiv: dotsDiv,
-          onStop: setIdle,
+          exercises: exercises,
+          repetitions: repetitions,
+          bars: bars,
+          prerollBars: prerollBars,
+          onFinished: setIdle
         });
-        metronome.start();
-        stopBtn.disabled = false;
-      });
 
-
-      stopBtn.addEventListener("click", e => {
-        e.target.disabled = true;
-        if (!metronome) { return; }
-        metronome.stop()
+        visualizer.start();
+        beeper.start();
+      }
+      else if (e.target.textContent == "Stop") {
+        console.assert(visualizer && beeper);
         setIdle();
-      });
-    }
+      }
+    });
 
-
-    const readyPromises = [HIGH_CLICK, MEDIUM_CLICK, LOW_CLICK].map(e =>
-      new Promise(resolve => {
-        if (e.readyState >= 4) {
-          resolve();
-        } else {
-          e.addEventListener("canplaythrough", () => resolve(), { once: true });
+    document.addEventListener("keydown", e => {
+      if (e.key == " ") {
+        if (startStopBtn != document.activeElement) {
+          startStopBtn.click();
         }
-      })
-    );
-
-    Promise.all(readyPromises).then(e => main())
-
+      }
+    });
   })();
   //]]>
 </script>
