@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>Stick Control Timer</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    html,
+    body,
+    #container {
+      height: 100%;
+      margin: 0;
+      background-color: darkgreen;
+      font-family: Verdana, Geneva, Tahoma, sans-serif;
+      color: white;
+    }
+
+    button:disabled {
+      opacity: 50%;
+    }
+
+    .transport {
+      min-width: 150px;
+    }
+
+    #container {
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: 1.5fr 3fr 1fr 2fr;
+      gap: 0px 0px;
+      grid-template-areas:
+        "context"
+        "time"
+        "controls"
+        "settings";
+    }
+
+    .cell {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: calc(100% + 2vw);
+    }
+
+    #context {
+      grid-area: context;
+    }
+
+    #time {
+      grid-area: time;
+      font-size: calc(100% + 15vw);
+    }
+
+    #controls {
+      grid-area: controls;
+    }
+
+    #controls button {
+      font-size: calc(100% + 0.05vw);
+      margin: 10px;
+      padding: 10px;
+      border-radius: 15px;
+    }
+
+    #settings {
+      grid-area: settings;
+      font-size: calc(100% + 0.05vw);
+    }
+
+    #start {
+      background-color: green;
+      color: yellow;
+    }
+
+    #stop {
+      background-color: red;
+      color: yellow;
+    }
+
+    .idle {
+      color: grey;
+    }
+
+    .running {
+      color: yellow;
+    }
+
+    .alerting {
+      color: red;
+      animation: blink 0.5s linear infinite;
+    }
+
+    @keyframes blink {
+      50% {
+        opacity: 0;
+      }
+    }
+
+    .paused {
+      color: lightgrey;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="container">
+    <div id="context" class="cell">&ndash;&ndash;&ndash;</div>
+    <div id="time" class="cell idle">&ndash;&ndash;&ndash;</div>
+    <div id="controls" class="cell">
+      <button id="start" class="transport">&#9654;</button>
+      <button id="stop" class="transport" disabled>&#9209;</button>
+    </div>
+    <div id="settings" class="cell">
+      <div id="values">
+        <label for="countdown-duration">Countdown time</label>:
+        <input id="countdown-duration" type="number" min="30" max="480">
+        <label for="alert-duration">Alert time</label>:
+        <input id="alert-duration" type="number" min="0" max="480">
+        <label for="pause-duration">Pause time</label>:
+        <input id="pause-duration" type="number" min="0" max="480">
+      </div>
+      <div>
+        <label for="tempo">Tempo</label>:
+        <select id="tempo"></select>
+        <label for="repetitions">Repetitions</label>:
+        <select id="repetitions"></select>
+        <button id="apply">Apply</button>
+        <span id="presets"></span>
+      </div>
+    </div>
+  </div>
+</body>
+
+<script type="text/javascript">
+  //<![CDATA[
+  const DEFAULT_COUNTDOWN_DURATION = 120;
+  const DEFAULT_ALERT_DURATION = 10;
+  const DEFAULT_PAUSE_DURATION = 5;
+  const DEFAULT_TEMPO = 100;
+  const DEFAULT_REPETITIONS = 20;
+  const DEFAULT_RATE = 8;
+
+  const PAUSED_STR = "&ndash;&ndash;&ndash;";
+
+  function h(s) {
+    return new Option(s).innerHTML;
+  }
+
+  function attr(s) {
+    return new Option(s).innerHTML.replace("\"", "&quot;");
+  }
+
+  class Ui {
+    constructor() {
+      this.startButton = document.getElementById("start");
+      this.stopButton = document.getElementById("stop");
+      this.resetButton = document.getElementById("reset");
+      this.contextDiv = document.getElementById("context");
+      this.timeDiv = document.getElementById("time");
+      this.countdownDurationInput = document.getElementById("countdown-duration");
+      this.alertDurationInput = document.getElementById("alert-duration");
+      this.pauseDurationInput = document.getElementById("pause-duration");
+      this.tempoSelect = document.getElementById("tempo");
+      this.repetitionsSelect = document.getElementById("repetitions");
+      this.applyButton = document.getElementById("apply");
+    }
+
+    run(timer) {
+      this.startButton.addEventListener("click", e => {
+        this.startButton.disabled = true;
+        this.stopButton.disabled = false;
+        const countdownDuration = parseInt(this.countdownDurationInput.value);
+        const alertDuration = parseInt(this.alertDurationInput.value);
+        const pauseDuration = parseInt(this.pauseDurationInput.value);
+        timer.start(countdownDuration, alertDuration, pauseDuration);
+      });
+
+      this.stopButton.addEventListener("click", e => {
+        this.startButton.disabled = false;
+        this.stopButton.disabled = true;
+        timer.stop();
+      });
+
+      window.onload = () => {
+        this.countdownDurationInput.value = DEFAULT_COUNTDOWN_DURATION;
+        this.alertDurationInput.value = DEFAULT_ALERT_DURATION;
+        this.pauseDurationInput.value = DEFAULT_PAUSE_DURATION;
+      };
+
+      document.addEventListener("keydown", e => {
+        if (e.key == " ") {
+          if (!this.startButton.disabled) {
+            this.startButton.click()
+          }
+          else if (!this.stopButton.disabled) {
+            this.stopButton.click()
+          }
+        }
+        else if (e.key == "Enter") {
+          this.startButton.click()
+        }
+        else if (e.key == "Escape") {
+          this.stopButton.click()
+        }
+      });
+
+      fetch("data.json")
+        .then(response => response.json())
+        .then(data => {
+          this.#populateSettings(Object.hasOwn(data, "presets") ? data.presets : []);
+        })
+        .catch(e => alert(`Could not parse JSON from server: ${e}\n\nPlease ask Richard to fix this!`));
+    }
+
+    #populateSettings(presets) {
+      for (let tempo = 60; tempo <= 200; tempo += 5) {
+        const e = document.createElement("option");
+        e.value = tempo;
+        e.innerText = tempo.toString();
+        if (tempo == DEFAULT_TEMPO) {
+          e.selected = true;
+        }
+        this.tempoSelect.appendChild(e);
+      }
+
+      for (const repetitions of [1, 2, 5, 10, 20, 50]) {
+        const e = document.createElement("option");
+        e.value = repetitions;
+        e.innerText = repetitions.toString();
+        if (repetitions == DEFAULT_REPETITIONS) {
+          e.selected = true;
+        }
+        this.repetitionsSelect.appendChild(e);
+      }
+
+      this.applyButton.addEventListener("click", e => {
+        const tempo = parseInt(this.tempoSelect.value);
+        const repetitions = parseInt(this.repetitionsSelect.value);
+        const countdownDuration = Math.round(60 / tempo * DEFAULT_RATE * repetitions);
+        this.countdownDurationInput.value = countdownDuration;
+        this.alertDurationInput.value = DEFAULT_ALERT_DURATION;
+        this.pauseDurationInput.value = DEFAULT_PAUSE_DURATION;
+      });
+
+      const presetsSpan = document.getElementById("presets");
+      for (const preset of presets) {
+        const button = document.createElement("button");
+        button.countdownDuration = preset.countdownDuration;
+        button.alertDuration = preset.alertDuration;
+        button.pauseDuration = preset.pauseDuration;
+        const descriptor = `${preset.countdownDuration}/${preset.alertDuration}/${preset.pauseDuration}`;
+        button.innerText = `${preset.name} (${descriptor})`;
+        presetsSpan.appendChild(button);
+
+        button.addEventListener("click", e => {
+          this.countdownDurationInput.value = e.target.countdownDuration;
+          this.alertDurationInput.value = e.target.alertDuration;
+          this.pauseDurationInput.value = e.target.pauseDuration;
+        });
+      }
+    }
+  }
+
+  const TimerState = Object.freeze({
+    IDLE: 0,
+    RUNNING: 1,
+    ALERTING: 2,
+    PAUSED: 3
+  });
+
+  class Timer {
+    constructor(ui) {
+      this.ui = ui;
+      this.state = TimerState.IDLE;
+      this.countdownDuration = null;
+      this.alertDuration = null;
+      this.pauseDuration = null;
+      this.iteration = null;
+      this.startTime = null;
+      this.intervalId = null;
+    }
+
+    start(countdownDuration, alertDuration, pauseDuration) {
+      if (this.state != TimerState.IDLE) { return; }
+
+      this.countdownDuration = countdownDuration;
+      this.alertDuration = alertDuration;
+      this.pauseDuration = pauseDuration;
+      this.iteration = 0;
+      this.#pause();
+      let self = this;
+      this.intervalId = setInterval(() => { self.#step() }, 10);
+    }
+
+    stop() {
+      if (this.state == TimerState.IDLE) { return; }
+
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+      this.startTime = null;
+      this.state = TimerState.IDLE;
+      this.#updateMessages(PAUSED_STR, PAUSED_STR, true);
+      this.iteration = null;
+      this.pauseDuration = null;
+      this.alertDuration = null;
+      this.countdownDuration = null;
+    }
+
+    #step() {
+      if (this.state == TimerState.IDLE) { return; }
+
+      const elapsed = Date.now() - this.startTime;
+      const seconds = elapsed / 1000;
+
+      switch (this.state) {
+        case TimerState.RUNNING: {
+          const remaining = this.countdownDuration - seconds;
+          if (remaining <= this.alertDuration) {
+            this.state = TimerState.ALERTING;
+            this.#updateMessages(null, null, true);
+          } else {
+            this.#updateMessages(null, h(remaining.toFixed(1)), false);
+          }
+          break;
+        }
+        case TimerState.ALERTING: {
+          const remaining = this.countdownDuration - seconds;
+          if (remaining <= 0) {
+            this.#pause();
+          } else {
+            this.#updateMessages(null, h(remaining.toFixed(1)), false);
+          }
+          break;
+        }
+        case TimerState.PAUSED: {
+          const remaining = this.pauseDuration - seconds;
+          if (remaining <= 0) {
+            this.state = TimerState.RUNNING;
+            this.#updateMessages(`repetition ${h(this.iteration)}`, h(this.countdownDuration.toFixed(1)), true);
+            this.startTime = Date.now();
+          }
+          break;
+        }
+      }
+    }
+
+    #pause() {
+      const iteration = ++this.iteration;
+      this.state = TimerState.PAUSED;
+
+      let contextDivHtml;
+      switch (iteration) {
+        case 1: contextDivHtml = `&rarr; repetition ${h(iteration)}`; break;
+        default: contextDivHtml = `repetition ${h(iteration - 1)} &rarr; ${h(iteration)}`; break;
+      }
+
+      this.#updateMessages(contextDivHtml, "get ready!", true);
+      this.startTime = Date.now();
+    }
+
+
+    #updateMessages(contextHtml = null, timeDivHtml = null, updateClasses = false) {
+      if (contextHtml) {
+        this.ui.contextDiv.innerHTML = contextHtml;
+      }
+
+      if (timeDivHtml) {
+        this.ui.timeDiv.innerHTML = timeDivHtml;
+      }
+
+      if (updateClasses) {
+        let cls;
+        switch (this.state) {
+          case TimerState.IDLE: cls = "idle"; break;
+          case TimerState.RUNNING: cls = "running"; break;
+          case TimerState.ALERTING: cls = "alerting"; break;
+          case TimerState.PAUSED: cls = "paused"; break;
+        }
+        this.ui.timeDiv.classList.remove("idle", "running", "alerting", "paused");
+        this.ui.timeDiv.classList.add(cls);
+      }
+    }
+  }
+
+  (() => {
+    const ui = new Ui();
+    ui.run(new Timer(ui));
+  })();
+  //]]>
+</script>
+
+</html>
