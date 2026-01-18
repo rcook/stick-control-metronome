@@ -1,7 +1,9 @@
-# Stick Control Timer
+# Stick Control Metronome
 
-[GitHub Pages][github-pages]
+* [Metronome][metronome]
+* [Timer][timer]
 
 [MIT License](LICENSE)
 
-[github-pages]: https://rcook.github.io/stick-control-timer/
+[metronome]: https://rcook.github.io/stick-control-metronome/
+[timer]: https://rcook.github.io/stick-control-metronome/timer.html
