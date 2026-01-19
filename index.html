@@ -351,21 +351,7 @@
 
       const frequency = this.#stepFrequency();
       if (frequency) {
-        const startTime = this.#nextStepTime;
-        const endTime = startTime + BEEP_DURATION;
-
-        const oscillator = this.#audioCtx.createOscillator();
-        oscillator.type = "sawtooth";
-        oscillator.frequency.value = frequency;
-        oscillator.start(startTime);
-        oscillator.stop(endTime);
-
-        const gain = this.#audioCtx.createGain();
-        gain.gain.setValueAtTime(1, startTime);
-        gain.gain.exponentialRampToValueAtTime(0.1, endTime);
-
-        oscillator.connect(gain);
-        gain.connect(this.#audioCtx.destination);
+        this.#decayingSawtooth(frequency);
       }
     }
 
@@ -376,6 +362,24 @@
         case LOW: return LOW_FREQUENCY;
         case HIGH: return null;
       }
+    }
+
+    #decayingSawtooth(frequency) {
+      const startTime = this.#nextStepTime;
+      const endTime = startTime + BEEP_DURATION;
+
+      const oscillator = this.#audioCtx.createOscillator();
+      oscillator.type = "sawtooth";
+      oscillator.frequency.value = frequency;
+      oscillator.start(startTime);
+      oscillator.stop(endTime);
+
+      const gain = this.#audioCtx.createGain();
+      gain.gain.setValueAtTime(1, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.1, endTime);
+
+      oscillator.connect(gain);
+      gain.connect(this.#audioCtx.destination);
     }
   }
 
