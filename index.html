@@ -821,30 +821,28 @@
   }
 
   (() => {
+    function readPresets() {
+      const json = localStorage.getItem("presets");
+      return json === null ? null : JSON.parse(json).toSorted((a, b) => a.name.localeCompare(b.name));
+    }
+
+    function writePresets(presets) {
+      const json = JSON.stringify(presets.toSorted((a, b) => a.name.localeCompare(b.name)));
+      localStorage.setItem("presets", json);
+    }
+
     function installPresets(data) {
-      if (!localStorage.getItem("presets")) {
-        const presets = Object.hasOwn(data, "presets") ? data.presets : [];
-        const presetsJson = JSON.stringify(presets);
-        localStorage.setItem("presets", presetsJson);
+      if (readPresets() === null) {
+        writePresets(Object.hasOwn(data, "presets") ? data.presets : []);
       }
     }
 
     function runApp() {
-      populatePresetsUi(document);
+      initializePresetsUi(document);
       new App(document);
     }
 
-    function populatePresetsUi(document) {
-      function specialOption(innerHtml, value = null, disabled = false) {
-        const e = document.createElement("option");
-        e.innerHTML = innerHtml;
-        if (value) {
-          e.value = value;
-        }
-        e.disabled = disabled;
-        presetSelect.appendChild(e);
-      }
-
+    function initializePresetsUi(document) {
       const tempoSelect = document.getElementById("tempo");
       const startExerciseInput = document.getElementById("start-exercise");
       const exercisesInput = document.getElementById("exercises");
@@ -857,29 +855,45 @@
       const presetContainerDiv = document.getElementById("preset-container");
       const presetSelect = document.getElementById("preset");
 
-      const presetsJson = localStorage.getItem("presets");
-      const presets = JSON.parse(presetsJson);
-      for (const preset of presets) {
-        const e = document.createElement("option");
-        e.innerHTML = h(preset.name);
-        e.value = "";
-        e.dataset.presetJson = JSON.stringify(preset);
-        presetSelect.appendChild(e);
-      }
+      populatePresetsUi(presetContainerDiv, presetSelect);
 
-      specialOption("__________", null, true);
-      specialOption("Save...", SAVE_ID);
-      specialOption("Remove...", REMOVE_ID);
-      specialOption("Clear...", CLEAR_ID);
-
-      presetContainerDiv.style.setProperty("display", "inline-block", "important");
-      presetSelect.selectedIndex = -1;
       presetSelect.addEventListener("change", e => {
         if (e.target.value.length > 0) {
           switch (parseInt(e.target.value)) {
-            case SAVE_ID: alert("TODO: Save"); break;
-            case REMOVE_ID: alert("TODO: Remove"); break;
-            case CLEAR_ID: alert("TODO: Clear"); break;
+            case SAVE_ID: {
+              const name = prompt("Enter preset name");
+              if (name !== null) {
+                const presets = readPresets();
+                presets.push({
+                  name: name,
+                  tempo: parseInt(tempoSelect.value),
+                  startExercise: startExerciseInput.valueAsNumber,
+                  exercises: exercisesInput.valueAsNumber,
+                  repetitions: parseInt(repetitionsSelect.value),
+                  bars: parseInt(barsSelect.value),
+                  beats: parseInt(beatsSelect.value),
+                  subdivisions: parseInt(subdivisionsSelect.value),
+                  pattern: patternInput.value,
+                  prerollBars: parseInt(prerollBarsSelect.value)
+                });
+                writePresets(presets);
+                populatePresetsUi(presetContainerDiv, presetSelect);
+              }
+              break;
+            }
+            case REMOVE_ID: {
+              const name = prompt("Enter preset name");
+              if (name !== null) {
+                writePresets(readPresets().filter(p => p.name.localeCompare(name)));
+                populatePresetsUi(presetContainerDiv, presetSelect);
+              }
+              break;
+            }
+            case CLEAR_ID: {
+              writePresets([]);
+              populatePresetsUi(presetContainerDiv, presetSelect);
+              break;
+            }
           }
           return;
         }
@@ -916,9 +930,37 @@
       })
     }
 
-    if (localStorage.getItem("presets")) {
-      runApp();
-    } else {
+    function populatePresetsUi(presetContainerDiv, presetSelect) {
+      function specialOption(innerHtml, value = null, disabled = false) {
+        const e = document.createElement("option");
+        e.innerHTML = innerHtml;
+        if (value) {
+          e.value = value;
+        }
+        e.disabled = disabled;
+        presetSelect.appendChild(e);
+      }
+
+      presetSelect.replaceChildren();
+
+      for (const preset of readPresets()) {
+        const e = document.createElement("option");
+        e.innerHTML = h(preset.name);
+        e.value = "";
+        e.dataset.presetJson = JSON.stringify(preset);
+        presetSelect.appendChild(e);
+      }
+
+      specialOption("__________", null, true);
+      specialOption("Save current parameters as preset...", SAVE_ID);
+      specialOption("Remove preset...", REMOVE_ID);
+      specialOption("Clear presets", CLEAR_ID);
+
+      presetContainerDiv.style.setProperty("display", "inline-block", "important");
+      presetSelect.selectedIndex = -1;
+    }
+
+    if (readPresets() === null) {
       fetch("data.json").then(response => {
         if (response.ok) {
           return response.json();
@@ -926,6 +968,8 @@
           throw new Error(`Failed to retrieve data from ${response.url}`);
         }
       }).then(installPresets).catch(console.error).then(runApp);
+    } else {
+      runApp();
     }
   })();
   //]]>
