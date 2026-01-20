@@ -376,8 +376,7 @@
       this.#lookahead = Object.hasOwn(options, "lookahead") ? options.lookahead : 0.1;
       this.#stepInterval = 60 / this.#tempo / this.#subdivisions;
       this.#clicks = {
-        //[Accent.HIGH]: new DecayingSawtoothClick(880),
-        [Accent.HIGH]: new FilteredWhiteNoiseClick(this.#audioCtx),
+        [Accent.HIGH]: new DecayingSawtoothClick(880),
         [Accent.MEDIUM]: new DecayingSawtoothClick(440),
         [Accent.LOW]: new DecayingSawtoothClick(220),
         [Accent.SILENT]: null
