@@ -193,13 +193,13 @@
   const START_CAPTION = "Start";
   const STOP_CAPTION = "Stop";
 
-  const HIGH = "A";
-  const MEDIUM = "B";
-  const LOW = "C";
-  const SILENT = "D";
-  const HIGH_FREQUENCY = 880;
-  const MEDIUM_FREQUENCY = 440;
-  const LOW_FREQUENCY = 220;
+  const Accent = Object.freeze({
+    HIGH: "A",
+    MEDIUM: "B",
+    LOW: "C",
+    SILENT: "D"
+  });
+
   const BEEP_DURATION = 0.1;
 
   const DEFAULT_TEMPO = 120;
@@ -213,6 +213,8 @@
 
   const IDLE_HTML = "&ndash;&ndash;&ndash;";
 
+  const OSCILLATOR_PADDING = 0.01;
+
   function h(s) {
     return new Option(s).innerHTML;
   }
@@ -225,13 +227,13 @@
     let pattern = "";
     for (let i = 0; i < beats; ++i) {
       if (i == 0) {
-        pattern += HIGH;
+        pattern += Accent.HIGH;
       } else {
-        pattern += MEDIUM;
+        pattern += Accent.MEDIUM;
       }
 
       for (let j = 0; j < subdivisions - 1; ++j) {
-        pattern += LOW;
+        pattern += Accent.LOW;
       }
     }
 
@@ -248,12 +250,78 @@
     return getReady ? `${name} ${value + 1} of ${count} (get ready!)` : `${name} ${value + 1} of ${count}`;
   }
 
-  class Queue {
-    #notes
+  class DecayingSawtoothClick {
+    #frequency
 
-    constructor() {
-      this.#notes = [];
+    constructor(frequency) {
+      this.#frequency = frequency;
     }
+
+    generate(audioCtx, startTime) {
+      const endTime = startTime + BEEP_DURATION;
+
+      const oscillator = audioCtx.createOscillator();
+      oscillator.type = "sawtooth";
+      oscillator.frequency.setValueAtTime(this.#frequency, startTime);
+      oscillator.start(startTime);
+      oscillator.stop(endTime + OSCILLATOR_PADDING);
+
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(1.0, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.1, endTime);
+
+      oscillator.connect(gain).connect(audioCtx.destination);
+    }
+  }
+
+  class FilteredWhiteNoiseClick {
+    static #buffers = {}
+    #buffer
+
+    constructor(audioCtx) {
+      this.#buffer = this.#getBuffer(audioCtx);
+    }
+
+    generate(audioCtx, startTime) {
+      const endTime = startTime + BEEP_DURATION;
+
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = this.#buffer;
+      noise.start(startTime);
+      noise.stop(endTime);
+
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = "highpass";
+      filter.frequency.setValueAtTime(2000, audioCtx.currentTime);
+
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(1, startTime + 0.001);
+      gain.gain.exponentialRampToValueAtTime(0.001, endTime);
+
+      noise.connect(filter).connect(gain).connect(audioCtx.destination);
+    }
+
+    #getBuffer(audioCtx) {
+      const temp = FilteredWhiteNoiseClick.#buffers[audioCtx];
+      if (temp !== undefined) { return temp; }
+
+      const bufferLen = audioCtx.sampleRate * 0.5;
+      const buffer = audioCtx.createBuffer(1, bufferLen, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferLen; ++i) {
+        data[i] = Math.random() * 2 - 1;
+      }
+
+      FilteredWhiteNoiseClick.#buffers[audioCtx] = buffer;
+      return buffer
+    }
+  }
+
+  class Queue {
+    #notes = [];
+
+    constructor() { }
 
     get isEmpty() { return this.#notes.length == 0; }
 
@@ -291,10 +359,11 @@
     #interval
     #lookahead
     #stepInterval
-    #nextStepTime
-    #step
-    #intervalId
-    #currentBar
+    #nextStepTime = null;
+    #step = null;
+    #intervalId = null;
+    #currentBar = null;
+    #clicks
 
     constructor(options) {
       this.#audioCtx = options.audioCtx;
@@ -306,10 +375,13 @@
       this.#interval = Object.hasOwn(options, "interval") ? options.interval : 30;
       this.#lookahead = Object.hasOwn(options, "lookahead") ? options.lookahead : 0.1;
       this.#stepInterval = 60 / this.#tempo / this.#subdivisions;
-      this.#nextStepTime = null;
-      this.#step = null;
-      this.#intervalId = null;
-      this.#currentBar = null;
+      this.#clicks = {
+        //[Accent.HIGH]: new DecayingSawtoothClick(880),
+        [Accent.HIGH]: new FilteredWhiteNoiseClick(this.#audioCtx),
+        [Accent.MEDIUM]: new DecayingSawtoothClick(440),
+        [Accent.LOW]: new DecayingSawtoothClick(220),
+        [Accent.SILENT]: null
+      };
     }
 
     start() {
@@ -349,37 +421,10 @@
         });
       }
 
-      const frequency = this.#stepFrequency();
-      if (frequency) {
-        this.#decayingSawtooth(frequency);
+      const click = this.#clicks[this.#pattern[this.#step]];
+      if (click) {
+        click.generate(this.#audioCtx, this.#nextStepTime)
       }
-    }
-
-    #stepFrequency() {
-      switch (this.#pattern[this.#step]) {
-        case HIGH: return HIGH_FREQUENCY;
-        case MEDIUM: return MEDIUM_FREQUENCY;
-        case LOW: return LOW_FREQUENCY;
-        case HIGH: return null;
-      }
-    }
-
-    #decayingSawtooth(frequency) {
-      const startTime = this.#nextStepTime;
-      const endTime = startTime + BEEP_DURATION;
-
-      const oscillator = this.#audioCtx.createOscillator();
-      oscillator.type = "sawtooth";
-      oscillator.frequency.value = frequency;
-      oscillator.start(startTime);
-      oscillator.stop(endTime);
-
-      const gain = this.#audioCtx.createGain();
-      gain.gain.setValueAtTime(1, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.1, endTime);
-
-      oscillator.connect(gain);
-      gain.connect(this.#audioCtx.destination);
     }
   }
 
@@ -398,9 +443,9 @@
     #prerollBars
     #startExercise
     #onFinished
-    #requestIds
-    #beats
-    #lastExercise
+    #requestIds = [];
+    #beats = null;
+    #lastExercise = 0;
 
     constructor(options) {
       this.#id = options.id;
@@ -417,9 +462,6 @@
       this.#prerollBars = options.prerollBars;
       this.#startExercise = options.startExercise;
       this.#onFinished = options.onFinished;
-      this.#requestIds = [];
-      this.#beats = null;
-      this.#lastExercise = 0;
     }
 
     get lastExercise() { return this.#lastExercise; }
@@ -525,12 +567,12 @@
     #subdivisionsSelect
     #patternInput
     #prerollBarsSelect
-    #trackerId
-    #audioCtx
-    #queue
-    #startExercise
-    #beeper
-    #tracker
+    #trackerId = 0;
+    #audioCtx = new AudioContext();
+    #queue = new Queue();
+    #startExercise = 0;
+    #beeper = null;
+    #tracker = null;
 
     constructor(document) {
       this.#body = document.body;
@@ -548,14 +590,6 @@
       this.#subdivisionsSelect = document.getElementById("subdivisions");
       this.#patternInput = document.getElementById("pattern");
       this.#prerollBarsSelect = document.getElementById("preroll-bars");
-
-      this.#trackerId = 0;
-      this.#audioCtx = new AudioContext();
-      this.#queue = new Queue();
-      this.#startExercise = 0;
-      this.#beeper = null;
-      this.#tracker = null;
-
       this.#initUi(document);
     }
 
