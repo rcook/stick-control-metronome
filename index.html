@@ -197,6 +197,8 @@
   const SAVE_ID = -1;
   const REMOVE_ID = -2;
   const CLEAR_ID = -3;
+  const IMPORT_ID = -4;
+  const EXPORT_ID = -5;
 
   const START_CAPTION = "Start";
   const STOP_CAPTION = "Stop";
@@ -894,6 +896,23 @@
               populatePresetsUi(presetContainerDiv, presetSelect);
               break;
             }
+            case IMPORT_ID: {
+              const encoded = prompt("Enter preset state");
+              if (encoded !== null) {
+                const s = atob(encoded);
+                const presets = JSON.parse(s);
+                writePresets(presets);
+                populatePresetsUi(presetContainerDiv, presetSelect);
+              }
+              break;
+            }
+            case EXPORT_ID: {
+              const presets = readPresets();
+              const s = JSON.stringify(presets);
+              const encoded = btoa(s);
+              navigator.clipboard.writeText(encoded).then(() => alert("Preset state written to clipboard!"));
+              break;
+            }
           }
           return;
         }
@@ -955,6 +974,8 @@
       specialOption("Save current parameters as preset...", SAVE_ID);
       specialOption("Remove preset...", REMOVE_ID);
       specialOption("Clear presets", CLEAR_ID);
+      specialOption("Import presets...", IMPORT_ID);
+      specialOption("Export presets...", EXPORT_ID);
 
       presetContainerDiv.style.setProperty("display", "inline-block", "important");
       presetSelect.selectedIndex = -1;
