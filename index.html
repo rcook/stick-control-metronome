@@ -253,6 +253,16 @@
   class DecayingSawtoothClick {
     #frequency
 
+    static Builder(frequency) {
+      return new class {
+        constructor() { }
+
+        build(audioCtx) {
+          return new DecayingSawtoothClick(frequency);
+        }
+      }
+    }
+
     constructor(frequency) {
       this.#frequency = frequency;
     }
@@ -277,6 +287,16 @@
   class FilteredWhiteNoiseClick {
     static #buffers = {}
     #buffer
+
+    static Builder() {
+      return new class {
+        constructor() { }
+
+        build(audioCtx) {
+          return new FilteredWhiteNoiseClick(audioCtx);
+        }
+      }
+    }
 
     constructor(audioCtx) {
       this.#buffer = this.#getBuffer(audioCtx);
@@ -317,6 +337,13 @@
       return buffer
     }
   }
+
+  const CLICKS = {
+    [Accent.HIGH]: DecayingSawtoothClick.Builder(880),
+    [Accent.MEDIUM]: DecayingSawtoothClick.Builder(440),
+    [Accent.LOW]: DecayingSawtoothClick.Builder(220),
+    [Accent.SILENT]: null
+  };
 
   class Queue {
     #notes = [];
@@ -375,12 +402,12 @@
       this.#interval = Object.hasOwn(options, "interval") ? options.interval : 30;
       this.#lookahead = Object.hasOwn(options, "lookahead") ? options.lookahead : 0.1;
       this.#stepInterval = 60 / this.#tempo / this.#subdivisions;
-      this.#clicks = {
-        [Accent.HIGH]: new DecayingSawtoothClick(880),
-        [Accent.MEDIUM]: new DecayingSawtoothClick(440),
-        [Accent.LOW]: new DecayingSawtoothClick(220),
-        [Accent.SILENT]: null
-      };
+      this.#clicks = Object.keys(options.clicks).reduce((acc, k) => {
+        const factory = options.clicks[k];
+        const click = factory ? factory.build(this.#audioCtx) : null;
+        acc[k] = click;
+        return acc;
+      }, {});
     }
 
     start() {
@@ -697,7 +724,8 @@
         beats: beats,
         subdivisions: subdivisions,
         pattern: pattern,
-        queue: this.#queue
+        queue: this.#queue,
+        clicks: CLICKS
       });
 
       this.#tracker = new Tracker({
