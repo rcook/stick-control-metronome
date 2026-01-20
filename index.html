@@ -285,7 +285,7 @@
   }
 
   class FilteredWhiteNoiseClick {
-    static #buffers = {}
+    static #buffers = {};
     #buffer
 
     static Builder() {
@@ -293,13 +293,14 @@
         constructor() { }
 
         build(audioCtx) {
-          return new FilteredWhiteNoiseClick(audioCtx);
+          const buffer = FilteredWhiteNoiseClick.#getBuffer(audioCtx);
+          return new FilteredWhiteNoiseClick(buffer);
         }
       }
     }
 
-    constructor(audioCtx) {
-      this.#buffer = this.#getBuffer(audioCtx);
+    constructor(buffer) {
+      this.#buffer = buffer;
     }
 
     generate(audioCtx, startTime) {
@@ -322,7 +323,7 @@
       noise.connect(filter).connect(gain).connect(audioCtx.destination);
     }
 
-    #getBuffer(audioCtx) {
+    static #getBuffer(audioCtx) {
       const temp = FilteredWhiteNoiseClick.#buffers[audioCtx];
       if (temp !== undefined) { return temp; }
 
