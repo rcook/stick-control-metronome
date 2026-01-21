@@ -162,9 +162,9 @@
         </div>
         <div>
           <select id="subdivisions" title="Subdivisions (with beats determines number of steps in pattern)">
-            <option value="1">&#9833;</option>
-            <option value="2">&#9834;</option>
-            <option value="4">&#119137;</option>
+            <option value="1">(None)</option>
+            <option value="2">8th note</option>
+            <option value="4">16th note</option>
           </select>
           <label for="subdivisions">subs</label>
         </div>
@@ -907,12 +907,12 @@
       window.history.replaceState({}, "", url);
     }
 
-    #populateSelect(document, select, min, max) {
+    #populateSelect(document, select, min, max, htmlFunc = null) {
       select.replaceChildren();
       for (let i = min; i <= max; ++i) {
         const e = document.createElement("option");
         e.value = i;
-        e.innerHTML = i.toString();
+        e.innerHTML = htmlFunc ? htmlFunc(i) : i.toString();
         select.appendChild(e);
       }
     }
