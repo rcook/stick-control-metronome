@@ -113,11 +113,56 @@
     #preset-container {
       display: none !important;
     }
+
+    .popup-source .label {
+      color: lightgreen;
+    }
+
+    .popup-source:hover {
+      text-decoration: underline;
+    }
+
+    .popup-source:hover .popup {
+      visibility: visible;
+      filter: drop-shadow(8px 8px 10px grey);
+    }
+
+    .popup {
+      border-radius: 10px;
+      visibility: hidden;
+      position: absolute;
+      z-index: 1;
+      background-color: whitesmoke;
+      padding: 10px;
+      border: 1px solid black;
+      max-width: 40vw;
+    }
   </style>
 </head>
 
 <body>
   <div id="container">
+    <div class="popup-source">
+      <a class="label">(?)</a>
+      <div class="popup">
+        <p>
+          This is a simple metronome and timer app I wrote to help me work through <a
+            href="https://www.stonepercussionbooks.com/stick-control.html">Stick Control</a> by George Stone.
+        </p>
+        <p>
+          Note that the exercises in the book are notated in cut time (2/2). Since I want to use this tool for other
+          practice exercises, I have chosen to measure bars in terms of quarter notes instead of half-notes which is a
+          little more convenient for practising along to music in 3/4, for example. Similarly,
+          tempo is defined here in terms of quarter notes per minute.
+        </p>
+        <p>
+          &ldquo;Preroll&rdquo; refers to one or more pickup bars that run immediately before the first exercise in
+          order for the user to gauge the correct tempo to play at. The page will flash an angry red colour when you hit
+          the last bar of the last repetition of each exercise in order to alert you that the next exercise is coming
+          up.
+        </p>
+      </div>
+    </div>
     <div id="indicators">
       <div id="progress-exercise">&ndash;&ndash;&ndash;</div>
       <div id="progress-repetition">&ndash;&ndash;&ndash;</div>
