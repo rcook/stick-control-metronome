@@ -618,14 +618,16 @@
     #subdivisionsSelect
     #patternInput
     #prerollBarsSelect
+    #presetContainerDiv
+    #presetSelect
     #trackerId = 0;
     #audioCtx = new AudioContext();
     #queue = new Queue();
     #startExercise = 0;
     #beeper = null;
     #tracker = null;
-    #elements
-    #defaultElementValues
+    #paramElements
+    #defaultParamElementValues
 
     constructor(document) {
       this.#body = document.body;
@@ -644,7 +646,10 @@
       this.#subdivisionsSelect = document.getElementById("subdivisions");
       this.#patternInput = document.getElementById("pattern");
       this.#prerollBarsSelect = document.getElementById("preroll-bars");
-      this.#elements = [
+      this.#presetContainerDiv = document.getElementById("preset-container");
+      this.#presetSelect = document.getElementById("preset");
+
+      this.#paramElements = [
         this.#tempoSelect,
         this.#startExerciseInput,
         this.#exercisesInput,
@@ -655,7 +660,7 @@
         this.#patternInput,
         this.#prerollBarsSelect
       ].toSorted((a, b) => a.id.localeCompare(b.id));
-      this.#defaultElementValues = {
+      this.#defaultParamElementValues = {
         [this.#tempoSelect.id]: DEFAULT_TEMPO,
         [this.#startExerciseInput.id]: DEFAULT_START_EXERCISE,
         [this.#exercisesInput.id]: DEFAULT_EXERCISES,
@@ -666,15 +671,35 @@
         [this.#patternInput.id]: makeDefaultPattern(DEFAULT_BEATS, DEFAULT_SUBDIVISIONS),
         [this.#prerollBarsSelect.id]: DEFAULT_PREROLL_BARS
       };
+
       this.#initUi(document);
+
+      if (this.#readPresets() === null) {
+        this.#fetchPresets().then(() => this.#initPresetsUi());
+      } else {
+        this.#initPresetsUi();
+      }
     }
 
-    pushState() {
-      const url = new URL(window.location);
-      for (const e of this.#elements) {
-        url.searchParams.set(e.id, e.value);
-      }
-      window.history.replaceState({}, "", url);
+    #fetchPresets() {
+      return fetch("data.json").then(response => {
+        if (response.ok) {
+          return response.json();
+        } else {
+          throw new Error(`Failed to retrieve data from ${response.url}`);
+        }
+      }).then(data => this.#writePresets(Object.hasOwn(data, "presets") ? data.presets : []))
+        .catch(console.error);
+    }
+
+    #readPresets() {
+      const json = localStorage.getItem("presets");
+      return json === null ? null : JSON.parse(json).toSorted((a, b) => a.name.localeCompare(b.name));
+    }
+
+    #writePresets(presets) {
+      const json = JSON.stringify(presets.toSorted((a, b) => a.name.localeCompare(b.name)));
+      localStorage.setItem("presets", json);
     }
 
     #initUi(document) {
@@ -690,9 +715,9 @@
       this.#startStopBtn.textContent = START_CAPTION;
 
       const params = new URLSearchParams(window.location.search);
-      for (const e of this.#elements) {
+      for (const e of this.#paramElements) {
         const value = params.get(e.id);
-        e.value = value === null ? this.#defaultElementValues[e.id] : value;
+        e.value = value === null ? this.#defaultParamElementValues[e.id] : value;
       }
 
       const inputs = [
@@ -707,8 +732,8 @@
         })
       }
 
-      for (const e of this.#elements) {
-        e.addEventListener("input", e => this.pushState());
+      for (const e of this.#paramElements) {
+        e.addEventListener("input", e => this.#pushState());
       }
 
       this.#beatsSelect.addEventListener("input", e => {
@@ -751,6 +776,145 @@
           }
         }
       });
+    }
+
+    #initPresetsUi(app, document) {
+      this.#populatePresetsUi();
+
+      this.#presetSelect.addEventListener("change", e => {
+        if (e.target.value.length > 0) {
+          switch (parseInt(e.target.value)) {
+            case SAVE_ID: {
+              const name = prompt("Enter preset name");
+              if (name !== null) {
+                const presets = this.#readPresets().filter(p => p.name.localeCompare(name));
+                presets.push({
+                  name: name,
+                  tempo: parseInt(this.#tempoSelect.value),
+                  startExercise: this.#startExerciseInput.valueAsNumber,
+                  exercises: this.#exercisesInput.valueAsNumber,
+                  repetitions: parseInt(this.#repetitionsSelect.value),
+                  bars: parseInt(this.#barsSelect.value),
+                  beats: parseInt(this.#beatsSelect.value),
+                  subdivisions: parseInt(this.#subdivisionsSelect.value),
+                  pattern: this.#patternInput.value,
+                  prerollBars: parseInt(this.#prerollBarsSelect.value)
+                });
+                this.#writePresets(presets);
+                this.#populatePresetsUi();
+              }
+              break;
+            }
+            case REMOVE_ID: {
+              const name = prompt("Enter preset name");
+              if (name !== null) {
+                this.#writePresets(this.#readPresets().filter(p => p.name.localeCompare(name)));
+                this.#populatePresetsUi();
+              }
+              break;
+            }
+            case CLEAR_ID: {
+              this.#writePresets([]);
+              this.#populatePresetsUi();
+              break;
+            }
+            case IMPORT_ID: {
+              const encoded = prompt("Enter preset state");
+              if (encoded !== null) {
+                const s = atob(encoded);
+                const presets = JSON.parse(s);
+                this.#writePresets(presets);
+                this.#populatePresetsUi();
+              }
+              break;
+            }
+            case EXPORT_ID: {
+              const presets = this.#readPresets();
+              const s = JSON.stringify(presets);
+              const encoded = btoa(s);
+              navigator.clipboard.writeText(encoded).then(() => alert("Preset state written to clipboard!"));
+              break;
+            }
+            case RESET_ID: {
+              this.#fetchPresets().then(() => this.#populatePresetsUi());
+            }
+          }
+          return;
+        }
+
+        const selectedOption = e.target.options[e.target.selectedIndex];
+        const preset = JSON.parse(selectedOption.dataset.presetJson);
+        if (Object.hasOwn(preset, "tempo")) {
+          this.#tempoSelect.value = preset.tempo;
+        }
+        if (Object.hasOwn(preset, "startExercise")) {
+          this.#startExerciseInput.value = preset.startExercise;
+        }
+        if (Object.hasOwn(preset, "exercises")) {
+          this.#exercisesInput.value = preset.exercises;
+        }
+        if (Object.hasOwn(preset, "repetitions")) {
+          this.#repetitionsSelect.value = preset.repetitions;
+        }
+        if (Object.hasOwn(preset, "bars")) {
+          this.#barsSelect.value = preset.bars;
+        }
+        if (Object.hasOwn(preset, "beats")) {
+          this.#beatsSelect.value = preset.beats;
+        }
+        if (Object.hasOwn(preset, "subdivisions")) {
+          this.#subdivisionsSelect.value = preset.subdivisions;
+        }
+        if (Object.hasOwn(preset, "pattern")) {
+          this.#patternInput.value = preset.pattern;
+        }
+        if (Object.hasOwn(preset, "prerollBars")) {
+          this.#prerollBarsSelect.value = preset.prerollBars;
+        }
+
+        this.#pushState();
+      })
+    }
+
+    #populatePresetsUi() {
+      function addCommandOption(presetSelect, innerHtml, value = null, disabled = false) {
+        const e = document.createElement("option");
+        e.innerHTML = innerHtml;
+        if (value) {
+          e.value = value;
+        }
+        e.disabled = disabled;
+        presetSelect.appendChild(e);
+      }
+
+      this.#presetSelect.replaceChildren();
+
+      for (const preset of this.#readPresets()) {
+        const e = document.createElement("option");
+        e.innerHTML = h(preset.name);
+        e.value = "";
+        e.dataset.presetJson = JSON.stringify(preset);
+        this.#presetSelect.appendChild(e);
+      }
+
+      addCommandOption(this.#presetSelect, "__________", null, true);
+      addCommandOption(this.#presetSelect, "Save current parameters as preset...", SAVE_ID);
+      addCommandOption(this.#presetSelect, "Remove preset...", REMOVE_ID);
+      addCommandOption(this.#presetSelect, "Clear presets", CLEAR_ID);
+      addCommandOption(this.#presetSelect, "Import presets...", IMPORT_ID);
+      addCommandOption(this.#presetSelect, "Export presets...", EXPORT_ID);
+      addCommandOption(this.#presetSelect, "Reset presets to defaults", RESET_ID);
+
+      this.#presetContainerDiv.style.setProperty("display", "inline-block", "important");
+      this.#presetSelect.selectedIndex = -1;
+    }
+
+    #pushState() {
+      const url = new URL(window.location);
+      for (const e of this.#paramElements) {
+        url.searchParams.set(e.id, e.value);
+      }
+      window.history.replaceState({}, "", url);
     }
 
     #populateSelect(document, select, min, max) {
@@ -856,182 +1020,7 @@
     }
   }
 
-  (() => {
-    function fetchPresets() {
-      return fetch("data.json").then(response => {
-        if (response.ok) {
-          return response.json();
-        } else {
-          throw new Error(`Failed to retrieve data from ${response.url}`);
-        }
-      }).then(data => writePresets(Object.hasOwn(data, "presets") ? data.presets : []))
-        .catch(console.error);
-    }
-
-    function readPresets() {
-      const json = localStorage.getItem("presets");
-      return json === null ? null : JSON.parse(json).toSorted((a, b) => a.name.localeCompare(b.name));
-    }
-
-    function writePresets(presets) {
-      const json = JSON.stringify(presets.toSorted((a, b) => a.name.localeCompare(b.name)));
-      localStorage.setItem("presets", json);
-    }
-
-    function runApp() {
-      const app = new App(document);
-      initializePresetsUi(app, document);
-    }
-
-    function initializePresetsUi(app, document) {
-      const tempoSelect = document.getElementById("tempo");
-      const startExerciseInput = document.getElementById("start-exercise");
-      const exercisesInput = document.getElementById("exercises");
-      const repetitionsSelect = document.getElementById("repetitions");
-      const barsSelect = document.getElementById("bars");
-      const beatsSelect = document.getElementById("beats");
-      const subdivisionsSelect = document.getElementById("subdivisions");
-      const patternInput = document.getElementById("pattern");
-      const prerollBarsSelect = document.getElementById("preroll-bars");
-      const presetContainerDiv = document.getElementById("preset-container");
-      const presetSelect = document.getElementById("preset");
-
-      populatePresetsUi(presetContainerDiv, presetSelect);
-
-      presetSelect.addEventListener("change", e => {
-        if (e.target.value.length > 0) {
-          switch (parseInt(e.target.value)) {
-            case SAVE_ID: {
-              const name = prompt("Enter preset name");
-              if (name !== null) {
-                const presets = readPresets();
-                presets.push({
-                  name: name,
-                  tempo: parseInt(tempoSelect.value),
-                  startExercise: startExerciseInput.valueAsNumber,
-                  exercises: exercisesInput.valueAsNumber,
-                  repetitions: parseInt(repetitionsSelect.value),
-                  bars: parseInt(barsSelect.value),
-                  beats: parseInt(beatsSelect.value),
-                  subdivisions: parseInt(subdivisionsSelect.value),
-                  pattern: patternInput.value,
-                  prerollBars: parseInt(prerollBarsSelect.value)
-                });
-                writePresets(presets);
-                populatePresetsUi(presetContainerDiv, presetSelect);
-              }
-              break;
-            }
-            case REMOVE_ID: {
-              const name = prompt("Enter preset name");
-              if (name !== null) {
-                writePresets(readPresets().filter(p => p.name.localeCompare(name)));
-                populatePresetsUi(presetContainerDiv, presetSelect);
-              }
-              break;
-            }
-            case CLEAR_ID: {
-              writePresets([]);
-              populatePresetsUi(presetContainerDiv, presetSelect);
-              break;
-            }
-            case IMPORT_ID: {
-              const encoded = prompt("Enter preset state");
-              if (encoded !== null) {
-                const s = atob(encoded);
-                const presets = JSON.parse(s);
-                writePresets(presets);
-                populatePresetsUi(presetContainerDiv, presetSelect);
-              }
-              break;
-            }
-            case EXPORT_ID: {
-              const presets = readPresets();
-              const s = JSON.stringify(presets);
-              const encoded = btoa(s);
-              navigator.clipboard.writeText(encoded).then(() => alert("Preset state written to clipboard!"));
-              break;
-            }
-            case RESET_ID: {
-              fetchPresets().then(() => populatePresetsUi(presetContainerDiv, presetSelect));
-            }
-          }
-          return;
-        }
-
-        const selectedOption = e.target.options[e.target.selectedIndex];
-        const preset = JSON.parse(selectedOption.dataset.presetJson);
-        if (Object.hasOwn(preset, "tempo")) {
-          tempoSelect.value = preset.tempo;
-        }
-        if (Object.hasOwn(preset, "startExercise")) {
-          startExerciseInput.value = preset.startExercise;
-        }
-        if (Object.hasOwn(preset, "exercises")) {
-          exercisesInput.value = preset.exercises;
-        }
-        if (Object.hasOwn(preset, "repetitions")) {
-          repetitionsSelect.value = preset.repetitions;
-        }
-        if (Object.hasOwn(preset, "bars")) {
-          barsSelect.value = preset.bars;
-        }
-        if (Object.hasOwn(preset, "beats")) {
-          beatsSelect.value = preset.beats;
-        }
-        if (Object.hasOwn(preset, "subdivisions")) {
-          subdivisionsSelect.value = preset.subdivisions;
-        }
-        if (Object.hasOwn(preset, "pattern")) {
-          patternInput.value = preset.pattern;
-        }
-        if (Object.hasOwn(preset, "prerollBars")) {
-          prerollBarsSelect.value = preset.prerollBars;
-        }
-
-        app.pushState();
-      })
-    }
-
-    function populatePresetsUi(presetContainerDiv, presetSelect) {
-      function specialOption(innerHtml, value = null, disabled = false) {
-        const e = document.createElement("option");
-        e.innerHTML = innerHtml;
-        if (value) {
-          e.value = value;
-        }
-        e.disabled = disabled;
-        presetSelect.appendChild(e);
-      }
-
-      presetSelect.replaceChildren();
-
-      for (const preset of readPresets()) {
-        const e = document.createElement("option");
-        e.innerHTML = h(preset.name);
-        e.value = "";
-        e.dataset.presetJson = JSON.stringify(preset);
-        presetSelect.appendChild(e);
-      }
-
-      specialOption("__________", null, true);
-      specialOption("Save current parameters as preset...", SAVE_ID);
-      specialOption("Remove preset...", REMOVE_ID);
-      specialOption("Clear presets", CLEAR_ID);
-      specialOption("Import presets...", IMPORT_ID);
-      specialOption("Export presets...", EXPORT_ID);
-      specialOption("Reset presets to defaults", RESET_ID);
-
-      presetContainerDiv.style.setProperty("display", "inline-block", "important");
-      presetSelect.selectedIndex = -1;
-    }
-
-    if (readPresets() === null) {
-      fetchPresets().then(runApp);
-    } else {
-      runApp();
-    }
-  })();
+  (() => new App(document))();
   //]]>
 </script>
 
