@@ -136,6 +136,14 @@
       padding: 10px;
       border: 1px solid black;
       max-width: 40vw;
+      height: 50vh;
+      overflow-y: scroll;
+    }
+
+    .popup th,
+    .popup td {
+      text-align: left;
+      padding: 2px 5px 2px 5px;
     }
   </style>
 </head>
@@ -163,6 +171,52 @@
         </p>
         <p>
           <a href="https://github.com/rcook/stick-control-metronome">Source code on GitHub</a>
+        </p>
+        <p>
+          Written by <a href="https://blog.rcook.org/">Richard Cook</a>
+        </p>
+        <h3>Patterns</h3>
+        <p>
+          The <em>pattern</em> field defines the pattern of accents of the metronome clicks. This will be a string whose
+          length is <em>beats &times; subdivisions</em> where each character represents the click type to generate at
+          the corresponding step:
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Character</th>
+              <th>Sound</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>A</td>
+              <td>Strong accent</td>
+            </tr>
+            <tr>
+              <td>B</td>
+              <td>Weak accent</td>
+            </tr>
+            <tr>
+              <td>C</td>
+              <td>No accent</td>
+            </tr>
+            <tr>
+              <td>D</td>
+              <td>Silent (no click)</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          The pattern will be truncated and padded to the correct number of steps and any unsupported characters will be
+          ignored and replaced with silence.
+        </p>
+        <h3>Keyboard</h3>
+        <p>
+          <em>Space</em> can be pressed to start and stop the metronome. If you stop the metronome beyond the first
+          exercise, you will be presented with a prompt allowing you to stop or resume the metronome and timer from the
+          beginning of the current exercise with a fresh run of preroll bars&mdash;this is useful when your practice
+          routine is interrupted by a phone call or a dog in desperate need of a belly rub.
         </p>
       </div>
     </div>
