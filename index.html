@@ -667,6 +667,7 @@
       this.#prerollBarsSelect.value = DEFAULT_PREROLL_BARS;
 
       const inputs = [
+        this.#startExerciseInput,
         this.#exercisesInput,
       ];
       for (const input of inputs) {
@@ -679,7 +680,7 @@
 
       this.#beatsSelect.addEventListener("input", e => {
         if (!e.target.validity.valid) { return; }
-        const beats = e.target.valueAsNumber;
+        const beats = parseInt(e.target.value);
         if (Number.isNaN(beats)) { return; }
 
         if (!this.#subdivisionsSelect.validity.valid) { return; }
@@ -695,7 +696,7 @@
         if (Number.isNaN(subdivisions)) { return; }
 
         if (!this.#beatsSelect.validity.valid) { return; }
-        const beats = this.#beatsSelect.valueAsNumber;
+        const beats = parseInt(this.#beatsSelect.value);
         if (Number.isNaN(beats)) { return; }
 
         this.#patternInput.value = makeDefaultPattern(beats, subdivisions);
