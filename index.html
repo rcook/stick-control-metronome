@@ -1018,7 +1018,6 @@
       for (const e of this.#paramElements) {
         url.searchParams.set(e.id, e.value);
       }
-      console.log(`pushState: ${url}`);
       window.history.replaceState({}, "", url);
     }
 
