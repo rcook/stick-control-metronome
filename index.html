@@ -336,7 +336,7 @@
   }
 
   function attr(s) {
-    return new Option(s).innerHTML.replace("\"", "&quot;");
+    return new Option(s).innerHTML.replaceAll("\"", "&quot;");
   }
 
   function makeDefaultPattern(beats, subdivisions) {
@@ -906,7 +906,7 @@
       });
     }
 
-    #initPresetsUi(app, document) {
+    #initPresetsUi() {
       this.#populatePresetsUi();
 
       this.#presetSelect.addEventListener("change", e => {
@@ -929,7 +929,6 @@
                   pattern: this.#patternInput.value,
                   prerollBars: parseInt(this.#prerollBarsSelect.value)
                 });
-                console.log(idx);
                 this.#populatePresetsUi();
                 this.#presetSelect.selectedIndex = idx;
               }
@@ -959,6 +958,7 @@
             }
             case RESET_ID: {
               this.#fetchPresets().then(() => this.#populatePresetsUi());
+              break;
             }
           }
           return;
