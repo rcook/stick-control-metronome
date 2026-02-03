@@ -325,6 +325,13 @@
 
   const BEEP_DURATION = 0.05;
 
+  const IDLE_HTML = "&ndash;&ndash;&ndash;";
+
+  const OSCILLATOR_PADDING = 0.01;
+
+  const SILENT_PARAM = "silent";
+  const IMPORT_PRESETS_PARAM = "import-presets";
+
   const DEFAULT_TEMPO = 120;
   const DEFAULT_START_EXERCISE = 1;
   const DEFAULT_EXERCISES = 24;
@@ -333,14 +340,33 @@
   const DEFAULT_BEATS = 4;
   const DEFAULT_SUBDIVISIONS = 2;
   const DEFAULT_PREROLL_BARS = 2;
-  const DEFAULT_START_BAR = 0;
 
-  const IDLE_HTML = "&ndash;&ndash;&ndash;";
+  const TEMPO_MIN = 50;
+  const TEMPO_MAX = 250;
+  const START_EXERCISE_MIN = 1;
+  const START_EXERCISE_MAX = 100;
+  const EXERCISES_MIN = 1;
+  const EXERCISES_MAX = 100;
+  const REPETITIONS_OPTIONS = [1, 2, 5, 10, 20, 50];
+  const BARS_OPTIONS = [1, 2, 3, 4];
+  const BEATS_MIN = 1;
+  const BEATS_MAX = 16;
+  const SUBDIVISIONS_OPTIONS = [1, 2, 4];
+  const PREROLL_BARS_OPTIONS = [1, 2, 3, 4];
 
-  const OSCILLATOR_PADDING = 0.01;
+  function parseNumber(s, min, max, defaultValue) {
+    if (s === null) { return defaultValue; }
+    const value = parseInt(s, 10);
+    if (Number.isNaN(value)) { return defaultValue; }
+    if (value < min) { return min; }
+    if (value > max) { return max; }
+    return value;
+  }
 
-  const SILENT_PARAM = "silent";
-  const IMPORT_PRESETS_PARAM = "import-presets";
+  function parseOneOf(s, options, defaultValue) {
+    const value = parseInt(s, 10);
+    return options.includes(value) ? value : defaultValue;
+  }
 
   function h(s) {
     return new Option(s).innerHTML;
@@ -769,15 +795,17 @@
         this.#prerollBarsSelect
       ].toSorted((a, b) => a.id.localeCompare(b.id));
       this.#paramMetadata = {
-        [this.#tempoSelect.id]: { name: "tempo", default: DEFAULT_TEMPO },
-        [this.#startExerciseInput.id]: { name: "startExercise", default: DEFAULT_START_EXERCISE },
-        [this.#exercisesInput.id]: { name: "exercises", default: DEFAULT_EXERCISES },
-        [this.#repetitionsSelect.id]: { name: "repetitions", default: DEFAULT_REPETITIONS },
-        [this.#barsSelect.id]: { name: "bars", default: DEFAULT_BARS },
-        [this.#beatsSelect.id]: { name: "beats", default: DEFAULT_BEATS },
-        [this.#subdivisionsSelect.id]: { name: "subdivisions", default: DEFAULT_SUBDIVISIONS },
-        [this.#patternInput.id]: { name: "pattern", default: makeDefaultPattern(DEFAULT_BEATS, DEFAULT_SUBDIVISIONS) },
-        [this.#prerollBarsSelect.id]: { name: "prerollBars", default: DEFAULT_PREROLL_BARS }
+        [this.#tempoSelect.id]: { name: "tempo", parse: s => parseNumber(s, TEMPO_MIN, TEMPO_MAX, DEFAULT_TEMPO) },
+        [this.#startExerciseInput.id]: { name: "startExercise", parse: s => parseNumber(s, START_EXERCISE_MIN, START_EXERCISE_MAX, DEFAULT_START_EXERCISE) },
+        [this.#exercisesInput.id]: { name: "exercises", parse: s => parseNumber(s, EXERCISES_MIN, EXERCISES_MAX, DEFAULT_EXERCISES) },
+        [this.#repetitionsSelect.id]: { name: "repetitions", parse: s => parseOneOf(s, REPETITIONS_OPTIONS, DEFAULT_REPETITIONS) },
+        [this.#barsSelect.id]: { name: "bars", parse: s => parseOneOf(s, BARS_OPTIONS, DEFAULT_BARS) },
+        [this.#beatsSelect.id]: { name: "beats", parse: s => parseNumber(s, BEATS_MIN, BEATS_MAX, DEFAULT_BEATS) },
+        [this.#subdivisionsSelect.id]: { name: "subdivisions", parse: s => parseOneOf(s, SUBDIVISIONS_OPTIONS, DEFAULT_SUBDIVISIONS) },
+        [this.#patternInput.id]: {
+          name: "pattern", parse: s => s === null ? makeDefaultPattern(DEFAULT_BEATS, DEFAULT_SUBDIVISIONS) : s
+        },
+        [this.#prerollBarsSelect.id]: { name: "prerollBars", parse: s => parseOneOf(s, PREROLL_BARS_OPTIONS, DEFAULT_PREROLL_BARS) }
       };
 
       const volume = silent ? 0.0 : 1.0;
@@ -864,9 +892,9 @@
       this.#startStopBtn.textContent = START_CAPTION;
 
       const params = new URLSearchParams(window.location.search);
-      for (const e of this.#paramElements) {
-        const value = params.get(e.id);
-        e.value = value === null ? this.#paramMetadata[e.id].default : value;
+      for (const paramElement of this.#paramElements) {
+        const metadata = this.#paramMetadata[paramElement.id];
+        paramElement.value = metadata.parse(params.get(paramElement.id));
       }
 
       const inputs = [
