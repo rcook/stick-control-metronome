@@ -346,10 +346,6 @@
     return new Option(s).innerHTML;
   }
 
-  function attr(s) {
-    return new Option(s).innerHTML.replaceAll("\"", "&quot;");
-  }
-
   function makeDefaultPattern(beats, subdivisions) {
     let pattern = "";
     for (let i = 0; i < beats; ++i) {
