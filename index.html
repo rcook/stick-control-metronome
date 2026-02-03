@@ -1053,25 +1053,25 @@
 
     #populatePresetsUi() {
       function addCommandOption(presetSelect, innerHtml, value = null, disabled = false) {
-        const e = document.createElement("option");
-        e.innerHTML = innerHtml;
+        const element = document.createElement("option");
+        element.innerHTML = innerHtml;
         if (value) {
-          e.value = value;
+          element.value = value;
         }
-        e.disabled = disabled;
-        presetSelect.appendChild(e);
+        element.disabled = disabled;
+        presetSelect.appendChild(element);
       }
 
       this.#presetSelect.replaceChildren();
 
       const presets = this.#readPresets();
       if (presets.length > 0) {
-        for (const preset of this.#readPresets()) {
-          const e = document.createElement("option");
-          e.innerHTML = h(preset.name);
-          e.value = "";
-          e.dataset.presetJson = JSON.stringify(preset);
-          this.#presetSelect.appendChild(e);
+        for (const preset of presets) {
+          const element = document.createElement("option");
+          element.innerHTML = h(preset.name);
+          element.value = "";
+          element.dataset.presetJson = JSON.stringify(preset);
+          this.#presetSelect.appendChild(element);
         }
 
         addCommandOption(this.#presetSelect, "__________", null, true);
