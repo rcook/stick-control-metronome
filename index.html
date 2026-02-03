@@ -358,7 +358,7 @@
   const MAX_IMPORT_JSON_BYTES = 100000;
 
   function parseNumber(s, min, max, defaultValue) {
-    if (s === null) { return defaultValue; }
+    if (s === null || s === undefined) { return defaultValue; }
     const value = parseInt(s, 10);
     if (Number.isNaN(value)) { return defaultValue; }
     if (value < min) { return min; }
@@ -367,7 +367,9 @@
   }
 
   function parseOneOf(s, options, defaultValue) {
+    if (s === null || s === undefined) { return defaultValue; }
     const value = parseInt(s, 10);
+    if (Number.isNaN(value)) { return defaultValue; }
     return options.includes(value) ? value : defaultValue;
   }
 
