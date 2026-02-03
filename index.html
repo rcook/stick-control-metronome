@@ -653,7 +653,7 @@
         this.#dotsDiv.replaceChildren();
         for (let i = 0; i < this.#beats; ++i) {
           const e = document.createElement("div");
-          e.innerHTML = (i + 1).toString();
+          e.textContent = (i + 1).toString();
           e.classList.add("dot");
           this.#dotsDiv.appendChild(e);
         }
