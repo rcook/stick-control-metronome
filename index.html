@@ -1104,9 +1104,8 @@
         const preset = JSON.parse(selectedOption.dataset.presetJson);
         for (const paramElement of this.#paramElements) {
           const metadata = this.#paramMetadata[paramElement.id];
-          if (Object.hasOwn(preset, metadata.name)) {
-            paramElement.value = preset[metadata.name];
-          }
+          if (!Object.hasOwn(preset, metadata.name)) { continue; }
+          paramElement.value = preset[metadata.name];
         }
         this.#pushState();
       })
