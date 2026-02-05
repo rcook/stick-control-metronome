@@ -988,11 +988,11 @@
 
       this.#beatsSelect.addEventListener("input", event => {
         if (!event.target.validity.valid) { return; }
-        const beats = parseInt(event.target.value);
+        const beats = parseInt(event.target.value, 10);
         if (Number.isNaN(beats)) { return; }
 
         if (!this.#subdivisionsSelect.validity.valid) { return; }
-        const subdivisions = parseInt(this.#subdivisionsSelect.value);
+        const subdivisions = parseInt(this.#subdivisionsSelect.value, 10);
         if (Number.isNaN(subdivisions)) { return; }
 
         this.#patternInput.value = makeDefaultPattern(beats, subdivisions);
@@ -1000,11 +1000,11 @@
 
       this.#subdivisionsSelect.addEventListener("input", event => {
         if (!event.target.validity.valid) { return; }
-        const subdivisions = parseInt(event.target.value);
+        const subdivisions = parseInt(event.target.value, 10);
         if (Number.isNaN(subdivisions)) { return; }
 
         if (!this.#beatsSelect.validity.valid) { return; }
-        const beats = parseInt(this.#beatsSelect.value);
+        const beats = parseInt(this.#beatsSelect.value, 10);
         if (Number.isNaN(beats)) { return; }
 
         this.#patternInput.value = makeDefaultPattern(beats, subdivisions);
@@ -1033,7 +1033,7 @@
 
       this.#presetSelect.addEventListener("change", event => {
         if (event.target.value.length > 0) {
-          const command = parseInt(event.target.value);
+          const command = parseInt(event.target.value, 10);
           event.target.selectedIndex = -1;
           switch (command) {
             case SAVE_ID: {
@@ -1041,15 +1041,15 @@
               if (name !== null) {
                 const idx = this.#addOrOverwritePreset({
                   name: name,
-                  tempo: parseInt(this.#tempoSelect.value),
+                  tempo: parseInt(this.#tempoSelect.value, 10),
                   startExercise: this.#startExerciseInput.valueAsNumber,
                   exercises: this.#exercisesInput.valueAsNumber,
-                  repetitions: parseInt(this.#repetitionsSelect.value),
-                  bars: parseInt(this.#barsSelect.value),
-                  beats: parseInt(this.#beatsSelect.value),
-                  subdivisions: parseInt(this.#subdivisionsSelect.value),
+                  repetitions: parseInt(this.#repetitionsSelect.value, 10),
+                  bars: parseInt(this.#barsSelect.value, 10),
+                  beats: parseInt(this.#beatsSelect.value, 10),
+                  subdivisions: parseInt(this.#subdivisionsSelect.value, 10),
                   pattern: this.#patternInput.value,
-                  prerollBars: parseInt(this.#prerollBarsSelect.value)
+                  prerollBars: parseInt(this.#prerollBarsSelect.value, 10)
                 });
                 this.#populatePresetsUi();
                 this.#presetSelect.selectedIndex = idx;
@@ -1169,12 +1169,12 @@
       const tempo = parseInt(this.#tempoSelect.value, 10);
       const exerciseOffset = this.#startExerciseInput.valueAsNumber - 1;
       const exercises = this.#exercisesInput.valueAsNumber;
-      const repetitions = parseInt(this.#repetitionsSelect.value);
-      const bars = parseInt(this.#barsSelect.value);
-      const beats = parseInt(this.#beatsSelect.value);
-      const subdivisions = parseInt(this.#subdivisionsSelect.value);
+      const repetitions = parseInt(this.#repetitionsSelect.value, 10);
+      const bars = parseInt(this.#barsSelect.value, 10);
+      const beats = parseInt(this.#beatsSelect.value, 10);
+      const subdivisions = parseInt(this.#subdivisionsSelect.value, 10);
       const pattern = parsePattern(this.#patternInput.value, beats, subdivisions);
-      const prerollBars = parseInt(this.#prerollBarsSelect.value);
+      const prerollBars = parseInt(this.#prerollBarsSelect.value, 10);
 
       this.#beeper = new Beeper({
         audioCtx: this.#audioCtx,
