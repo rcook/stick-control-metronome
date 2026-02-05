@@ -1020,7 +1020,7 @@
       });
 
       document.addEventListener("keydown", event => {
-        if (event.key === " ") {
+        if (event.key === " " || event.key === "Spacebar") {
           if (this.#startStopBtn !== document.activeElement) {
             this.#startStopBtn.click();
           }
@@ -1166,7 +1166,7 @@
       this.#startStopBtn.textContent = STOP_CAPTION;
       this.#fields.disabled = true;
 
-      const tempo = parseInt(this.#tempoSelect.value);
+      const tempo = parseInt(this.#tempoSelect.value, 10);
       const exerciseOffset = this.#startExerciseInput.valueAsNumber - 1;
       const exercises = this.#exercisesInput.valueAsNumber;
       const repetitions = parseInt(this.#repetitionsSelect.value);
