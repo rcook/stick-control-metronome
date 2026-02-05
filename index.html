@@ -1020,10 +1020,9 @@
       });
 
       document.addEventListener("keydown", event => {
-        if (event.key === " " || event.key === "Spacebar") {
-          if (this.#startStopBtn !== document.activeElement) {
-            this.#startStopBtn.click();
-          }
+        if (event.key !== " " && event.key !== "Spacebar") { return; }
+        if (this.#startStopBtn !== document.activeElement) {
+          this.#startStopBtn.click();
         }
       });
     }
@@ -1082,8 +1081,7 @@
               break;
             }
             case RESET_ID: {
-              this
-                .#fetchPresets()
+              this.#fetchPresets()
                 .then(() => this.#populatePresetsUi())
                 .catch(err => this.#showFetchError(err));
               break;
