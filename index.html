@@ -153,6 +153,30 @@
       margin: 0.5rem 0;
       border-radius: 4px;
     }
+
+    .export-url-container {
+      margin: 0.5rem 0;
+      padding: 0.5rem;
+      background: #f5f5f5;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+
+    .export-url-container label {
+      display: block;
+      margin-bottom: 0.25rem;
+    }
+
+    .export-url-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .export-url-row input {
+      flex: 1;
+      min-width: 0;
+    }
   </style>
 </head>
 
@@ -235,6 +259,14 @@
       <div id="dots" class="dots"></div>
     </div>
     <div id="fetch-error" class="fetch-error" role="alert" hidden></div>
+    <div id="export-url-container" class="export-url-container" hidden>
+      <label for="export-url-input">Copy this link to import presets in another browser:</label>
+      <div class="export-url-row">
+        <input id="export-url-input" type="text" readonly>
+        <button type="button" id="export-url-copy">Copy</button>
+        <button type="button" id="export-url-close">Close</button>
+      </div>
+    </div>
     <div id="controls">
       <div id="buttons">
         <button type="button" id="start-stop">Start</button>
@@ -753,6 +785,10 @@
     #presetContainerDiv
     #presetSelect
     #fetchErrorDiv
+    #exportUrlContainer
+    #exportUrlInput
+    #exportUrlCopyBtn
+    #exportUrlCloseBtn
     #trackerId = 0;
     #audioCtx = new AudioContext();
     #queue = new Queue();
@@ -787,6 +823,10 @@
       this.#presetContainerDiv = document.getElementById("preset-container");
       this.#presetSelect = document.getElementById("preset");
       this.#fetchErrorDiv = document.getElementById("fetch-error");
+      this.#exportUrlContainer = document.getElementById("export-url-container");
+      this.#exportUrlInput = document.getElementById("export-url-input");
+      this.#exportUrlCopyBtn = document.getElementById("export-url-copy");
+      this.#exportUrlCloseBtn = document.getElementById("export-url-close");
 
       this.#paramElements = [
         this.#tempoSelect,
@@ -913,6 +953,14 @@
 
       this.#startStopBtn.textContent = START_CAPTION;
 
+      this.#exportUrlCopyBtn.addEventListener("click", () => {
+        this.#exportUrlInput.select();
+        navigator.clipboard.writeText(this.#exportUrlInput.value).catch(() => { });
+      });
+      this.#exportUrlCloseBtn.addEventListener("click", () => {
+        this.#exportUrlContainer.hidden = true;
+      });
+
       const params = new URLSearchParams(window.location.search);
       for (const paramElement of this.#paramElements) {
         const metadata = this.#paramMetadata[paramElement.id];
@@ -1027,7 +1075,10 @@
               const url = new URL(window.location.href);
               url.searchParams.forEach((v, k) => url.searchParams.delete(k));
               url.searchParams.set(IMPORT_PRESETS_PARAM, encoded);
-              prompt("Copy this link and paste into a different browser to import your presets", url.toString());
+              const exportUrl = url.toString();
+              this.#exportUrlInput.value = exportUrl;
+              this.#exportUrlContainer.hidden = false;
+              this.#exportUrlInput.select();
               break;
             }
             case RESET_ID: {
