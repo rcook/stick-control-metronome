@@ -444,7 +444,7 @@
 
   function parsePattern(s, beats, subdivisions) {
     const len = beats * subdivisions;
-    return s.substring(0, len).padEnd(len, "D");
+    return (s ?? "").substring(0, len).padEnd(len, "D");
   }
 
   function formatProgress(name, value, count, offset = null, getReady = false) {
@@ -863,7 +863,7 @@
         [this.#beatsSelect.id]: { name: "beats", parse: s => parseNumber(s, BEATS_MIN, BEATS_MAX, DEFAULT_BEATS) },
         [this.#subdivisionsSelect.id]: { name: "subdivisions", parse: s => parseOneOf(s, SUBDIVISIONS_OPTIONS, DEFAULT_SUBDIVISIONS) },
         [this.#patternInput.id]: {
-          name: "pattern", parse: s => s === null ? makeDefaultPattern(DEFAULT_BEATS, DEFAULT_SUBDIVISIONS) : s
+          name: "pattern", parse: s => s ?? makeDefaultPattern(DEFAULT_BEATS, DEFAULT_SUBDIVISIONS) : s
         },
         [this.#prerollBarsSelect.id]: { name: "prerollBars", parse: s => parseOneOf(s, PREROLL_BARS_OPTIONS, DEFAULT_PREROLL_BARS) }
       };
@@ -934,7 +934,10 @@
           console.error(`Fetch from ${response.url} failed with HTTP status ${response.status}`);
           throw new Error(`Failed to load default presets from ${DATA_FILE_NAME}`);
         }
-      }).then(data => this.#writePresets(Object.hasOwn(data, "presets") ? data.presets : []));
+      }).then(data => {
+        const presets = Object.hasOwn(data, "presets") && Array.isArray(data.presets) ? data.presets : [];
+        return this.#writePresets(presets);
+      });
     }
 
     #readPresets() {
@@ -950,7 +953,7 @@
 
     #writePresets(presets) {
       if (!Array.isArray(presets)) { return []; }
-      const sortedPresets = presets.toSorted((a, b) => a.name.localeCompare(b.name));
+      const sortedPresets = presets.toSorted((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
       const json = JSON.stringify(sortedPresets);
       localStorage.setItem("presets", json);
       return sortedPresets;
@@ -958,7 +961,7 @@
 
     #addOrOverwritePreset(preset) {
       const raw = this.#readPresets();
-      const presets = (raw ?? []).filter(p => p.name.localeCompare(preset.name));
+      const presets = (raw ?? []).filter(p => (p.name ?? "").localeCompare(preset.name) !== 0);
       presets.push(preset);
       const newPresets = this.#writePresets(presets);
       return newPresets.findIndex(p => !p.name.localeCompare(preset.name));
