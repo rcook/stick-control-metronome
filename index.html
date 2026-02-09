@@ -198,7 +198,7 @@
     <div class="popup-source">
       <button type="button" class="label" aria-label="Help" aria-expanded="false"
         aria-controls="help-popup">(?)</button>
-      <div class="popup">
+      <div id="help-popup" class="popup">
         <h2>About Stick Control Metronome</h2>
         <p>
           This is a simple metronome and timer app I wrote to help me work through <a
@@ -942,7 +942,7 @@
       if (json === null) { return null; }
       try {
         const obj = JSON.parse(json);
-        return Array.isArray(obj) ? obj.toSorted((a, b) => a.name.localeCompare(b.name)) : null;
+        return Array.isArray(obj) ? obj.toSorted((a, b) => (a.name ?? "").localeCompare(b.name ?? "")) : null;
       } catch {
         return null;
       }
@@ -1208,7 +1208,7 @@
       this.#startStopBtn.textContent = STOP_CAPTION;
       this.#fields.disabled = true;
 
-      const tempo = parseInt(this.#tempoSelect.value, 10);
+      const tempo = Math.max(TEMPO_MIN, parseInt(this.#tempoSelect.value, 10));
       const exerciseOffset = this.#startExerciseInput.valueAsNumber - 1;
       const exercises = this.#exercisesInput.valueAsNumber;
       const repetitions = parseInt(this.#repetitionsSelect.value, 10);
