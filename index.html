@@ -348,6 +348,7 @@
   </div>
 </body>
 
+<script src="js/utils.js"></script>
 <script>
   //<![CDATA[
   "use strict";
@@ -362,13 +363,6 @@
 
   const START_CAPTION = "Start";
   const STOP_CAPTION = "Stop";
-
-  const Accent = Object.freeze({
-    HIGH: "A",
-    MEDIUM: "B",
-    LOW: "C",
-    SILENT: "D"
-  });
 
   const BEEP_DURATION = 0.05;
 
@@ -404,55 +398,8 @@
   const MAX_IMPORT_PRESETS_LENGTH = 1000;
   const MAX_IMPORT_JSON_BYTES = 100000;
 
-  function parseNumber(s, min, max, defaultValue) {
-    if (s === null || s === undefined) { return defaultValue; }
-    const value = parseInt(s, 10);
-    if (Number.isNaN(value)) { return defaultValue; }
-    if (value < min) { return min; }
-    if (value > max) { return max; }
-    return value;
-  }
-
-  function parseOneOf(s, options, defaultValue) {
-    if (s === null || s === undefined) { return defaultValue; }
-    const value = parseInt(s, 10);
-    if (Number.isNaN(value)) { return defaultValue; }
-    return options.includes(value) ? value : defaultValue;
-  }
-
   function h(s) {
     return new Option(s).innerHTML;
-  }
-
-  function makeDefaultPattern(beats, subdivisions) {
-    let pattern = "";
-    for (let i = 0; i < beats; ++i) {
-      if (i === 0) {
-        pattern += Accent.HIGH;
-      } else {
-        pattern += Accent.MEDIUM;
-      }
-
-      for (let j = 0; j < subdivisions - 1; ++j) {
-        pattern += Accent.LOW;
-      }
-    }
-
-    console.assert(pattern.length === beats * subdivisions);
-    return pattern;
-  }
-
-  function parsePattern(s, beats, subdivisions) {
-    const len = beats * subdivisions;
-    return (s ?? "").substring(0, len).padEnd(len, "D");
-  }
-
-  function formatProgress(name, value, count, offset = null, getReady = false) {
-    let s = offset === null ? `${name} ${value + 1} of ${count}` : `${name} ${value + offset + 1} (${value + 1} of ${count})`;
-    if (getReady) {
-      s += " (get ready!)";
-    }
-    return s;
   }
 
   class DecayingSawtoothClick {
