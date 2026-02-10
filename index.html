@@ -810,7 +810,7 @@
         [this.#beatsSelect.id]: { name: "beats", parse: s => parseNumber(s, BEATS_MIN, BEATS_MAX, DEFAULT_BEATS) },
         [this.#subdivisionsSelect.id]: { name: "subdivisions", parse: s => parseOneOf(s, SUBDIVISIONS_OPTIONS, DEFAULT_SUBDIVISIONS) },
         [this.#patternInput.id]: {
-          name: "pattern", parse: s => s ?? makeDefaultPattern(DEFAULT_BEATS, DEFAULT_SUBDIVISIONS) : s
+          name: "pattern", parse: s => s ?? makeDefaultPattern(DEFAULT_BEATS, DEFAULT_SUBDIVISIONS)
         },
         [this.#prerollBarsSelect.id]: { name: "prerollBars", parse: s => parseOneOf(s, PREROLL_BARS_OPTIONS, DEFAULT_PREROLL_BARS) }
       };
