@@ -112,6 +112,55 @@
 
     #preset-container {
       display: none !important;
+      flex-direction: column;
+    }
+
+    #preset-container .preset-current {
+      display: block;
+    }
+
+    .preset-menu {
+      width: auto;
+      min-width: 12em;
+      max-width: 24em;
+      max-height: 50vh;
+      overflow-y: auto;
+    }
+
+    .preset-menu [role="menuitem"],
+    .preset-menu .preset-menu-separator {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 0.35em 0.5em;
+      border: none;
+      background: none;
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    .preset-menu [role="menuitem"]:hover,
+    .preset-menu [role="menuitem"]:focus {
+      background-color: #e0e0e0;
+    }
+
+    .preset-menu .preset-menu-separator {
+      cursor: default;
+      border-top: 1px solid #ccc;
+      margin-top: 0.25em;
+      padding-top: 0.25em;
+    }
+
+    .preset-menu .preset-menu-separator[aria-disabled="true"] {
+      color: #999;
+    }
+
+    .preset-current {
+      font-size: 0.85em;
+      color: inherit;
+      margin-bottom: 0.2em;
+      min-height: 1.2em;
     }
 
     .popup-source {
@@ -339,9 +388,10 @@
           </select>
           <label for="preroll-bars">preroll</label>
         </div>
-        <div id="preset-container">
-          <select id="preset" title="Presets"></select>
-          <label for="preset">presets</label>
+        <div id="preset-container" class="popup-source">
+          <div id="preset-current" class="preset-current" aria-live="polite"></div>
+          <button type="button" id="preset" class="label" aria-haspopup="true" aria-expanded="false" aria-controls="preset-menu" title="Presets">presets</button>
+          <div id="preset-menu" class="popup preset-menu" role="menu" aria-label="Presets"></div>
         </div>
       </fieldset>
     </div>
@@ -757,7 +807,9 @@
     #patternInput
     #prerollBarsSelect
     #presetContainerDiv
-    #presetSelect
+    #presetCurrentEl
+    #presetBtn
+    #presetMenu
     #fetchErrorDiv
     #exportUrlContainer
     #exportUrlInput
@@ -795,7 +847,9 @@
       this.#patternInput = document.getElementById("pattern");
       this.#prerollBarsSelect = document.getElementById("preroll-bars");
       this.#presetContainerDiv = document.getElementById("preset-container");
-      this.#presetSelect = document.getElementById("preset");
+      this.#presetCurrentEl = document.getElementById("preset-current");
+      this.#presetBtn = document.getElementById("preset");
+      this.#presetMenu = document.getElementById("preset-menu");
       this.#fetchErrorDiv = document.getElementById("fetch-error");
       this.#exportUrlContainer = document.getElementById("export-url-container");
       this.#exportUrlInput = document.getElementById("export-url-input");
@@ -966,7 +1020,7 @@
 
       for (const paramElement of this.#paramElements) {
         paramElement.addEventListener("input", event => {
-          this.#presetSelect.selectedIndex = -1;
+          this.#presetCurrentEl.textContent = "";
           this.#pushState();
         });
       }
@@ -1020,15 +1074,18 @@
     #initPresetsUi() {
       this.#populatePresetsUi();
 
-      this.#presetSelect.addEventListener("change", event => {
-        if (event.target.value.length > 0) {
-          const command = parseInt(event.target.value, 10);
-          event.target.selectedIndex = -1;
-          switch (command) {
+      this.#presetMenu.addEventListener("click", event => {
+        const target = event.target;
+        if (!target.matches("[role=\"menuitem\"]") || target.getAttribute("aria-disabled") === "true") { return; }
+
+        const command = target.getAttribute("data-command");
+        if (command !== null) {
+          const cmd = parseInt(command, 10);
+          switch (cmd) {
             case SAVE_ID: {
               const name = prompt("Enter preset name");
               if (name !== null) {
-                const idx = this.#addOrOverwritePreset({
+                this.#addOrOverwritePreset({
                   name: name,
                   tempo: parseInt(this.#tempoSelect.value, 10),
                   startExercise: this.#startExerciseInput.valueAsNumber,
@@ -1041,7 +1098,6 @@
                   prerollBars: parseInt(this.#prerollBarsSelect.value, 10)
                 });
                 this.#populatePresetsUi();
-                this.#presetSelect.selectedIndex = idx;
               }
               break;
             }
@@ -1050,12 +1106,16 @@
               if (name !== null) {
                 const raw = this.#readPresets();
                 this.#writePresets((raw ?? []).filter(p => p.name.localeCompare(name)));
+                if (this.#presetCurrentEl.textContent === name) {
+                  this.#presetCurrentEl.textContent = "";
+                }
                 this.#populatePresetsUi();
               }
               break;
             }
             case CLEAR_ID: {
               this.#writePresets([]);
+              this.#presetCurrentEl.textContent = "";
               this.#populatePresetsUi();
               break;
             }
@@ -1082,8 +1142,7 @@
           return;
         }
 
-        const selectedOption = event.target.options[event.target.selectedIndex];
-        const json = selectedOption?.dataset.presetJson;
+        const json = target.getAttribute("data-preset-json");
         if (!json) { return; }
 
         let preset;
@@ -1104,44 +1163,57 @@
           }
           paramElement.value = value;
         }
+        this.#presetCurrentEl.textContent = preset.name ?? "";
         this.#pushState();
-      })
+      });
     }
 
     #populatePresetsUi() {
-      function addCommandOption(presetSelect, innerHtml, value = null, disabled = false) {
-        const element = document.createElement("option");
-        element.innerHTML = innerHtml;
-        if (value !== null) {
-          element.value = value;
+      function addMenuItem(menu, text, options = {}) {
+        const element = document.createElement("button");
+        element.type = "button";
+        element.setAttribute("role", "menuitem");
+        element.textContent = text;
+        if (options.command !== undefined) {
+          element.setAttribute("data-command", String(options.command));
         }
-        element.disabled = disabled;
-        presetSelect.appendChild(element);
+        if (options.presetJson !== undefined) {
+          element.setAttribute("data-preset-json", options.presetJson);
+        }
+        if (options.disabled) {
+          element.setAttribute("aria-disabled", "true");
+          element.disabled = true;
+        }
+        menu.appendChild(element);
       }
 
-      this.#presetSelect.replaceChildren();
+      function addSeparator(menu) {
+        const element = document.createElement("div");
+        element.setAttribute("role", "menuitem");
+        element.className = "preset-menu-separator";
+        element.setAttribute("aria-disabled", "true");
+        element.textContent = "__________";
+        menu.appendChild(element);
+      }
+
+      this.#presetMenu.replaceChildren();
 
       const presets = this.#readPresets() ?? [];
       if (presets.length > 0) {
         for (const preset of presets) {
-          const element = document.createElement("option");
-          element.innerHTML = h(preset.name);
-          element.value = "";
-          element.dataset.presetJson = JSON.stringify(preset);
-          this.#presetSelect.appendChild(element);
+          addMenuItem(this.#presetMenu, preset.name, { presetJson: JSON.stringify(preset) });
         }
-
-        addCommandOption(this.#presetSelect, "__________", null, true);
+        addSeparator(this.#presetMenu);
       }
 
-      addCommandOption(this.#presetSelect, "Save current parameters as preset...", SAVE_ID);
-      addCommandOption(this.#presetSelect, "Remove preset...", REMOVE_ID);
-      addCommandOption(this.#presetSelect, "Clear all presets", CLEAR_ID);
-      addCommandOption(this.#presetSelect, "Export presets...", EXPORT_ID);
-      addCommandOption(this.#presetSelect, "Reset presets to defaults", RESET_ID);
+      addMenuItem(this.#presetMenu, "Save current parameters as preset...", { command: SAVE_ID });
+      addMenuItem(this.#presetMenu, "Remove preset...", { command: REMOVE_ID });
+      addMenuItem(this.#presetMenu, "Clear all presets", { command: CLEAR_ID });
+      addMenuItem(this.#presetMenu, "Export presets...", { command: EXPORT_ID });
+      addMenuItem(this.#presetMenu, "Reset presets to defaults", { command: RESET_ID });
 
-      this.#presetContainerDiv.style.setProperty("display", "inline-block", "important");
-      this.#presetSelect.selectedIndex = -1;
+      this.#presetContainerDiv.style.setProperty("display", "inline-flex", "important");
+      this.#presetContainerDiv.style.setProperty("flex-direction", "column", "important");
     }
 
     #pushState() {
