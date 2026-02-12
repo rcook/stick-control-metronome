@@ -574,13 +574,25 @@
     }
 
     #scheduleBeeps() {
-      while (this.#nextStepTime < this.#audioCtx.currentTime + this.#lookahead) {
+      const now = this.#audioCtx.currentTime;
+
+      // Advance playhead to "now" without scheduling: avoids scheduling past events which would play as a burst
+      while (this.#nextStepTime < now) {
+        this.#advanceStep();
+      }
+
+      while (this.#nextStepTime < now + this.#lookahead) {
+        // Schedule beeps and UI notes for the next lookahead window.
         this.#scheduleBeep();
-        this.#nextStepTime += this.#stepInterval;
-        this.#step = (this.#step + 1) % this.#pattern.length;
-        if (this.#step === 0) {
-          ++this.#currentBar;
-        }
+        this.#advanceStep();
+      }
+    }
+
+    #advanceStep() {
+      this.#nextStepTime += this.#stepInterval;
+      this.#step = (this.#step + 1) % this.#pattern.length;
+      if (this.#step === 0) {
+        ++this.#currentBar;
       }
     }
 
