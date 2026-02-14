@@ -1,6 +1,41 @@
 (() => {
   "use strict";
 
+  class Param {
+    #name
+    #id
+    #element
+
+    constructor(name, id) {
+      this.#name = name;
+      this.#id = id;
+      this.#element = document.getElementById(this.#id);
+    }
+
+    get name() { return this.#name; }
+    get id() { return this.#id; }
+    get element() { return this.#element; }
+  }
+
+  class CheckboxParam extends Param {
+    constructor(name, id) {
+      super(name, id);
+    }
+
+    parse(s) { return parseBool(s); }
+
+    set value(value) { this.element.checked = value; }
+  }
+
+  class InputOrSelectParam extends Param {
+    constructor(name, id) {
+      super(name, id);
+    }
+
+    get value() { return "valueAsNumber" in this.element ? this.element.valueAsNumber : parseInt(this.element.value, 10); }
+    set value(value) { this.element.value = value; }
+  }
+
   const Accent = Object.freeze({
     HIGH: "A",
     MEDIUM: "B",
@@ -58,6 +93,9 @@
     return s;
   }
 
+  window.Param = Param;
+  window.CheckboxParam = CheckboxParam;
+  window.InputOrSelectParam = InputOrSelectParam;
   window.Accent = Accent;
   window.parseBool = parseBool;
   window.parseNumber = parseNumber;

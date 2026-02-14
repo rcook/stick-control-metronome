@@ -834,6 +834,62 @@
     }
   }
 
+  class DarkModeParam extends CheckboxParam {
+    constructor(name, id) {
+      super(name, id);
+      this.element.addEventListener("change", () => document.documentElement.classList.toggle("dark", this.element.checked));
+    }
+
+    get value() { return this.element.checked; }
+
+    set value(value) {
+      super.value = value;
+      document.documentElement.classList.toggle("dark", value);
+    }
+  }
+
+  class IntParam extends InputOrSelectParam {
+    #min
+    #max
+    #defaultValue
+
+    constructor(name, id, min, max, defaultValue) {
+      super(name, id);
+      this.#min = min;
+      this.#max = max;
+      this.#defaultValue = defaultValue;
+    }
+
+    parse(s) { return parseNumber(s, this.#min, this.#max, this.#defaultValue); }
+  }
+
+  class ChoiceParam extends InputOrSelectParam {
+    #choices
+    #defaultValue
+
+    constructor(name, id, choices, defaultValue) {
+      super(name, id);
+      this.#choices = choices;
+      this.#defaultValue = defaultValue;
+    }
+
+    parse(s) { return parseOneOf(s, this.#choices, this.#defaultValue); }
+  }
+
+  class PatternParam extends InputOrSelectParam {
+    #defaultValue
+
+    constructor(name, id, defaultValue) {
+      super(name, id);
+      this.#defaultValue = defaultValue;
+    }
+
+    parse(s) { return s ?? this.#defaultValue; }
+
+    get value() { return this.element.value; }
+    set value(value) { super.value = value; }
+  }
+
   class App {
     #body
     #progressExerciseDiv
@@ -842,16 +898,16 @@
     #dotsDiv
     #startStopBtn
     #fields
-    #tempoSelect
-    #startExerciseInput
-    #exercisesInput
-    #repetitionsSelect
-    #barsSelect
-    #beatsSelect
-    #subdivisionsSelect
-    #patternInput
-    #prerollBarsSelect
-    #darkModeCheckbox
+    #darkModeParam
+    #tempoParam
+    #startExerciseParam
+    #exercisesParam
+    #repetitionsParam
+    #barsParam
+    #beatsParam
+    #subdivisionsParam
+    #patternParam
+    #prerollBarsParam
     #presetContainerDiv
     #presetSelect
     #fetchErrorDiv
@@ -865,8 +921,7 @@
     #startExercise = 0;
     #beeper = null;
     #tracker = null;
-    #paramElements
-    #paramMetadata
+    #params
     #clicks
 
     constructor(document, window) {
@@ -881,16 +936,16 @@
       this.#dotsDiv = document.getElementById("dots");
       this.#startStopBtn = document.getElementById("start-stop");
       this.#fields = document.getElementById("fields");
-      this.#darkModeCheckbox = document.getElementById("dark-mode");
-      this.#tempoSelect = document.getElementById("tempo");
-      this.#startExerciseInput = document.getElementById("start-exercise");
-      this.#exercisesInput = document.getElementById("exercises");
-      this.#repetitionsSelect = document.getElementById("repetitions");
-      this.#barsSelect = document.getElementById("bars");
-      this.#beatsSelect = document.getElementById("beats");
-      this.#subdivisionsSelect = document.getElementById("subdivisions");
-      this.#patternInput = document.getElementById("pattern");
-      this.#prerollBarsSelect = document.getElementById("preroll-bars");
+      this.#darkModeParam = new DarkModeParam("darkMode", "dark-mode");
+      this.#tempoParam = new IntParam("tempo", "tempo", TEMPO_MIN, TEMPO_MAX, DEFAULT_TEMPO);
+      this.#startExerciseParam = new IntParam("startExercise", "start-exercise", START_EXERCISE_MIN, START_EXERCISE_MAX, DEFAULT_START_EXERCISE)
+      this.#exercisesParam = new IntParam("exercises", "exercises", EXERCISES_MIN, EXERCISES_MAX, DEFAULT_EXERCISES);
+      this.#repetitionsParam = new ChoiceParam("repetitions", "repetitions", REPETITIONS_OPTIONS, DEFAULT_REPETITIONS);
+      this.#barsParam = new ChoiceParam("bars", "bars", BARS_OPTIONS, DEFAULT_BARS);
+      this.#beatsParam = new IntParam("beats", "beats", BEATS_MIN, BEATS_MAX, DEFAULT_BEATS)
+      this.#subdivisionsParam = new ChoiceParam("subdivisions", "subdivisions", SUBDIVISIONS_OPTIONS, DEFAULT_SUBDIVISIONS);
+      this.#patternParam = new PatternParam("pattern", "pattern", makeDefaultPattern(DEFAULT_BEATS, DEFAULT_SUBDIVISIONS));
+      this.#prerollBarsParam = new ChoiceParam("prerollBars", "preroll-bars", PREROLL_BARS_OPTIONS, DEFAULT_PREROLL_BARS);
       this.#presetContainerDiv = document.getElementById("preset-container");
       this.#presetSelect = document.getElementById("preset");
       this.#fetchErrorDiv = document.getElementById("fetch-error");
@@ -899,41 +954,18 @@
       this.#exportUrlCopyBtn = document.getElementById("export-url-copy");
       this.#exportUrlCloseBtn = document.getElementById("export-url-close");
 
-      this.#paramElements = [
-        this.#darkModeCheckbox,
-        this.#tempoSelect,
-        this.#startExerciseInput,
-        this.#exercisesInput,
-        this.#repetitionsSelect,
-        this.#barsSelect,
-        this.#beatsSelect,
-        this.#subdivisionsSelect,
-        this.#patternInput,
-        this.#prerollBarsSelect
+      this.#params = [
+        this.#darkModeParam,
+        this.#tempoParam,
+        this.#startExerciseParam,
+        this.#exercisesParam,
+        this.#repetitionsParam,
+        this.#barsParam,
+        this.#beatsParam,
+        this.#subdivisionsParam,
+        this.#patternParam,
+        this.#prerollBarsParam
       ].toSorted((a, b) => a.id.localeCompare(b.id));
-      this.#paramMetadata = {
-        [this.#darkModeCheckbox.id]: {
-          name: "darkMode",
-          parse: parseBool,
-          getValue: () => this.#darkModeCheckbox.checked,
-          setValue: value => {
-            this.#darkModeCheckbox.checked = value;
-            document.documentElement.classList.toggle("dark", value);
-          },
-          onChange: () => document.documentElement.classList.toggle("dark", this.#darkModeCheckbox.checked)
-        },
-        [this.#tempoSelect.id]: { name: "tempo", parse: s => parseNumber(s, TEMPO_MIN, TEMPO_MAX, DEFAULT_TEMPO) },
-        [this.#startExerciseInput.id]: { name: "startExercise", parse: s => parseNumber(s, START_EXERCISE_MIN, START_EXERCISE_MAX, DEFAULT_START_EXERCISE) },
-        [this.#exercisesInput.id]: { name: "exercises", parse: s => parseNumber(s, EXERCISES_MIN, EXERCISES_MAX, DEFAULT_EXERCISES) },
-        [this.#repetitionsSelect.id]: { name: "repetitions", parse: s => parseOneOf(s, REPETITIONS_OPTIONS, DEFAULT_REPETITIONS) },
-        [this.#barsSelect.id]: { name: "bars", parse: s => parseOneOf(s, BARS_OPTIONS, DEFAULT_BARS) },
-        [this.#beatsSelect.id]: { name: "beats", parse: s => parseNumber(s, BEATS_MIN, BEATS_MAX, DEFAULT_BEATS) },
-        [this.#subdivisionsSelect.id]: { name: "subdivisions", parse: s => parseOneOf(s, SUBDIVISIONS_OPTIONS, DEFAULT_SUBDIVISIONS) },
-        [this.#patternInput.id]: {
-          name: "pattern", parse: s => s ?? makeDefaultPattern(DEFAULT_BEATS, DEFAULT_SUBDIVISIONS)
-        },
-        [this.#prerollBarsSelect.id]: { name: "prerollBars", parse: s => parseOneOf(s, PREROLL_BARS_OPTIONS, DEFAULT_PREROLL_BARS) }
-      };
 
       const volume = silent ? 0.0 : 1.0;
       this.#clicks = {
@@ -1040,9 +1072,9 @@
       this.#progressBarDiv.innerHTML = IDLE_HTML;
       this.#dotsDiv.replaceChildren();
 
-      this.#populateSelect(this.#tempoSelect, 50, 250);
-      this.#populateSelect(this.#barsSelect, 1, 4);
-      this.#populateSelect(this.#beatsSelect, 1, 16);
+      this.#populateSelect(this.#tempoParam, 50, 250);
+      this.#populateSelect(this.#barsParam, 1, 4);
+      this.#populateSelect(this.#beatsParam, 1, 16);
 
       this.#startStopBtn.textContent = START_CAPTION;
 
@@ -1055,24 +1087,13 @@
       });
 
       const params = new URLSearchParams(window.location.search);
-      for (const paramElement of this.#paramElements) {
-        const metadata = this.#paramMetadata[paramElement.id];
-        const value = metadata.parse(params.get(paramElement.id));
-
-        if (Object.hasOwn(metadata, "setValue")) {
-          metadata.setValue(value);
-        } else {
-          paramElement.value = value;
-        }
-
-        if (Object.hasOwn(metadata, "onChange")) {
-          paramElement.addEventListener("change", metadata.onChange);
-        }
+      for (const p of this.#params) {
+        p.value = p.parse(params.get(p.id));
       }
 
       const inputs = [
-        this.#startExerciseInput,
-        this.#exercisesInput,
+        this.#startExerciseParam.element,
+        this.#exercisesParam.element,
       ];
       for (const input of inputs) {
         input.addEventListener("keydown", event => {
@@ -1082,35 +1103,35 @@
         });
       }
 
-      for (const paramElement of this.#paramElements) {
-        paramElement.addEventListener("input", event => {
+      for (const p of this.#params) {
+        p.element.addEventListener("input", event => {
           this.#presetSelect.selectedIndex = -1;
           this.#pushState();
         });
       }
 
-      this.#beatsSelect.addEventListener("input", event => {
+      this.#beatsParam.element.addEventListener("input", event => {
         if (!event.target.validity.valid) { return; }
         const beats = parseInt(event.target.value, 10);
         if (Number.isNaN(beats)) { return; }
 
-        if (!this.#subdivisionsSelect.validity.valid) { return; }
-        const subdivisions = parseInt(this.#subdivisionsSelect.value, 10);
+        if (!this.#subdivisionsParam.element.validity.valid) { return; }
+        const subdivisions = parseInt(this.#subdivisionsParam.element.value, 10);
         if (Number.isNaN(subdivisions)) { return; }
 
-        this.#patternInput.value = makeDefaultPattern(beats, subdivisions);
+        this.#patternParam.element.value = makeDefaultPattern(beats, subdivisions);
       });
 
-      this.#subdivisionsSelect.addEventListener("input", event => {
+      this.#subdivisionsParam.element.addEventListener("input", event => {
         if (!event.target.validity.valid) { return; }
         const subdivisions = parseInt(event.target.value, 10);
         if (Number.isNaN(subdivisions)) { return; }
 
-        if (!this.#beatsSelect.validity.valid) { return; }
-        const beats = parseInt(this.#beatsSelect.value, 10);
+        if (!this.#beatsParam.element.validity.valid) { return; }
+        const beats = parseInt(this.#beatsParam.element.value, 10);
         if (Number.isNaN(beats)) { return; }
 
-        this.#patternInput.value = makeDefaultPattern(beats, subdivisions);
+        this.#patternParam.element.value = makeDefaultPattern(beats, subdivisions);
       });
 
       this.#startStopBtn.addEventListener("click", event => {
@@ -1146,19 +1167,12 @@
             case SAVE_ID: {
               const name = prompt("Enter preset name");
               if (name !== null) {
-                const idx = this.#addOrOverwritePreset({
-                  name: name,
-                  darkMode: this.#darkModeCheckbox.checked,
-                  tempo: parseInt(this.#tempoSelect.value, 10),
-                  startExercise: this.#startExerciseInput.valueAsNumber,
-                  exercises: this.#exercisesInput.valueAsNumber,
-                  repetitions: parseInt(this.#repetitionsSelect.value, 10),
-                  bars: parseInt(this.#barsSelect.value, 10),
-                  beats: parseInt(this.#beatsSelect.value, 10),
-                  subdivisions: parseInt(this.#subdivisionsSelect.value, 10),
-                  pattern: this.#patternInput.value,
-                  prerollBars: parseInt(this.#prerollBarsSelect.value, 10)
-                });
+                const preset = { name: name };
+                for (const p of this.#params) {
+                  preset[p.name] = p.value;
+                }
+
+                const idx = this.#addOrOverwritePreset(preset);
                 this.#populatePresetsUi();
                 this.#presetSelect.selectedIndex = idx;
               }
@@ -1214,19 +1228,14 @@
 
         if (!preset || typeof preset !== "object") { return; }
 
-        for (const paramElement of this.#paramElements) {
-          const metadata = this.#paramMetadata[paramElement.id];
-          if (!Object.hasOwn(preset, metadata.name)) { continue; }
-          let value = preset[metadata.name];
-          if (paramElement.tagName === "SELECT") {
+        for (const p of this.#params) {
+          if (!Object.hasOwn(preset, p.name)) { continue; }
+          let value = preset[p.name];
+          if (p.tagName === "SELECT") {
             value = String(value);
           }
 
-          if (Object.hasOwn(metadata, "setValue")) {
-            metadata.setValue(value);
-          } else {
-            paramElement.value = value;
-          }
+          p.value = value;
         }
         this.#pushState();
       })
@@ -1271,21 +1280,19 @@
     #pushState() {
       const url = new URL(window.location.href);
       url.searchParams.forEach((v, k) => url.searchParams.delete(k));
-      for (const paramElement of this.#paramElements) {
-        const metadata = this.#paramMetadata[paramElement.id];
-        const value = Object.hasOwn(metadata, "getValue") ? metadata.getValue() : paramElement.value;
-        url.searchParams.set(paramElement.id, value.toString());
+      for (const p of this.#params) {
+        url.searchParams.set(p.id, p.value.toString());
       }
       window.history.replaceState({}, "", url);
     }
 
-    #populateSelect(select, min, max, htmlFunc = null) {
-      select.replaceChildren();
+    #populateSelect(param, min, max, htmlFunc = null) {
+      param.element.replaceChildren();
       for (let i = min; i <= max; ++i) {
         const e = document.createElement("option");
         e.value = i;
         e.innerHTML = htmlFunc ? htmlFunc(i) : i.toString();
-        select.appendChild(e);
+        param.element.appendChild(e);
       }
     }
 
@@ -1296,15 +1303,15 @@
       this.#startStopBtn.textContent = STOP_CAPTION;
       this.#fields.disabled = true;
 
-      const tempo = Math.max(TEMPO_MIN, parseInt(this.#tempoSelect.value, 10));
-      const exerciseOffset = this.#startExerciseInput.valueAsNumber - 1;
-      const exercises = this.#exercisesInput.valueAsNumber;
-      const repetitions = parseInt(this.#repetitionsSelect.value, 10);
-      const bars = parseInt(this.#barsSelect.value, 10);
-      const beats = parseInt(this.#beatsSelect.value, 10);
-      const subdivisions = parseInt(this.#subdivisionsSelect.value, 10);
-      const pattern = parsePattern(this.#patternInput.value, beats, subdivisions);
-      const prerollBars = parseInt(this.#prerollBarsSelect.value, 10);
+      const tempo = Math.max(TEMPO_MIN, this.#tempoParam.value);
+      const exerciseOffset = this.#startExerciseParam.element.valueAsNumber - 1;
+      const exercises = this.#exercisesParam.element.valueAsNumber;
+      const repetitions = parseInt(this.#repetitionsParam.element.value, 10);
+      const bars = parseInt(this.#barsParam.element.value, 10);
+      const beats = parseInt(this.#beatsParam.element.value, 10);
+      const subdivisions = parseInt(this.#subdivisionsParam.element.value, 10);
+      const pattern = parsePattern(this.#patternParam.element.value, beats, subdivisions);
+      const prerollBars = parseInt(this.#prerollBarsParam.element.value, 10);
 
       this.#beeper = new Beeper({
         audioCtx: this.#audioCtx,
