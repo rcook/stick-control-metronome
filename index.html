@@ -1279,7 +1279,9 @@
 
     #pushState() {
       const url = new URL(window.location.href);
-      url.searchParams.forEach((v, k) => url.searchParams.delete(k));
+      for (const k of [...url.searchParams.keys()]) {
+        url.searchParams.delete(k);
+      }
       for (const p of this.#params) {
         url.searchParams.set(p.id, p.value.toString());
       }
