@@ -902,10 +902,10 @@
       this.#defaultValue = defaultValue;
     }
 
-    parse(s) { return s ?? this.#defaultValue; }
-
     get value() { return this.element.value; }
     set value(value) { super.value = value; }
+
+    parse(s) { return s ?? this.#defaultValue; }
   }
 
   class App {
