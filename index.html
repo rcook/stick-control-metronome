@@ -835,16 +835,33 @@
     }
   }
 
-  class DarkParam extends CheckboxParam {
+  class DarkParam extends Param {
     constructor(name, id) {
       super(name, id);
-      this.element.addEventListener("change", () => document.documentElement.classList.toggle("dark", this.element.checked));
+      this.element.addEventListener("change", () => this.#setValue(this.element.checked));
     }
 
     get value() { return this.element.checked; }
 
     set value(value) {
-      super.value = value;
+      this.#setValue(value);
+    }
+
+    parse(s) { return parseBool(s); }
+
+    init() {
+      let value;
+      try {
+        value = localStorage.getItem("dark") === "true";
+      } catch (_) {
+        value = false;
+      }
+      this.#setValue(value);
+    }
+
+    #setValue(value) {
+      this.element.checked = value;
+      try { localStorage.setItem("dark", value.toString()); } catch (_) { }
       document.documentElement.classList.toggle("dark", value);
     }
   }
@@ -922,10 +939,16 @@
     #startExercise = 0;
     #beeper = null;
     #tracker = null;
-    #params
+    #presetParams
+    #urlParams
+    #otherParams
     #clicks
 
     constructor(document, window) {
+      function toSortedParams(params) {
+        return params.toSorted((a, b) => a.compareTo(b));
+      }
+
       const params = new URLSearchParams(window.location.search);
       const silent = params.get(SILENT_PARAM) === "1";
       const importPresets = params.get(IMPORT_PRESETS_PARAM);
@@ -955,8 +978,7 @@
       this.#exportUrlCopyBtn = document.getElementById("export-url-copy");
       this.#exportUrlCloseBtn = document.getElementById("export-url-close");
 
-      this.#params = [
-        this.#darkParam,
+      this.#presetParams = toSortedParams([
         this.#tempoParam,
         this.#startExerciseParam,
         this.#exercisesParam,
@@ -966,7 +988,11 @@
         this.#subdivisionsParam,
         this.#patternParam,
         this.#prerollBarsParam
-      ].toSorted((a, b) => a.id.localeCompare(b.id));
+      ]);
+
+      this.#urlParams = toSortedParams([]);
+
+      this.#otherParams = toSortedParams([this.#darkParam]);
 
       const volume = silent ? 0.0 : 1.0;
       this.#clicks = {
@@ -1088,8 +1114,11 @@
       });
 
       const params = new URLSearchParams(window.location.search);
-      for (const p of this.#params) {
+      for (const p of [...this.#presetParams, ...this.#urlParams]) {
         p.value = p.parse(params.get(p.id));
+      }
+      for (const p of this.#otherParams) {
+        p.init();
       }
 
       const inputs = [
@@ -1104,7 +1133,7 @@
         });
       }
 
-      for (const p of this.#params) {
+      for (const p of [...this.#presetParams, ...this.#urlParams]) {
         p.element.addEventListener("input", event => {
           this.#presetSelect.selectedIndex = -1;
           this.#pushState();
@@ -1169,7 +1198,7 @@
               const name = prompt("Enter preset name");
               if (name !== null) {
                 const preset = { name: name };
-                for (const p of this.#params) {
+                for (const p of this.#presetParams) {
                   preset[p.name] = p.value;
                 }
 
@@ -1229,7 +1258,7 @@
 
         if (!preset || typeof preset !== "object") { return; }
 
-        for (const p of this.#params) {
+        for (const p of this.#presetParams) {
           if (!Object.hasOwn(preset, p.name)) { continue; }
           let value = preset[p.name];
           if (p.tagName === "SELECT") {
@@ -1283,7 +1312,7 @@
       for (const k of [...url.searchParams.keys()]) {
         url.searchParams.delete(k);
       }
-      for (const p of this.#params) {
+      for (const p of [...this.#presetParams, ...this.#urlParams]) {
         url.searchParams.set(p.id, p.value.toString());
       }
       window.history.replaceState({}, "", url);

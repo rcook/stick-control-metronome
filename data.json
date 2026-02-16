@@ -2,7 +2,6 @@
   "presets": [
     {
       "name": "(Default)",
-      "dark": false,
       "tempo": 120,
       "startExercise": 1,
       "exercises": 24,

@@ -15,16 +15,10 @@
     get name() { return this.#name; }
     get id() { return this.#id; }
     get element() { return this.#element; }
-  }
 
-  class CheckboxParam extends Param {
-    constructor(name, id) {
-      super(name, id);
+    compareTo(other) {
+      this.#id.localeCompare(other.#id)
     }
-
-    parse(s) { return parseBool(s); }
-
-    set value(value) { this.element.checked = value; }
   }
 
   class InputOrSelectParam extends Param {
@@ -94,7 +88,6 @@
   }
 
   window.Param = Param;
-  window.CheckboxParam = CheckboxParam;
   window.InputOrSelectParam = InputOrSelectParam;
   window.Accent = Accent;
   window.parseBool = parseBool;
