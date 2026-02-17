@@ -839,6 +839,7 @@
     constructor(name, id) {
       super(name, id);
       this.element.addEventListener("change", () => this.#setValue(this.element.checked));
+      window.addEventListener("pageshow", () => this.init());
     }
 
     get value() { return this.element.checked; }
