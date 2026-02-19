@@ -199,13 +199,13 @@
       display: none !important;
     }
 
-    .popup-source {
+    #metronome-header {
       position: relative;
       display: block;
       width: 100%;
     }
 
-    .popup-source .label {
+    #metronome-header .label {
       color: lightgreen;
       cursor: pointer;
       background: none;
@@ -214,25 +214,25 @@
       padding: 0.25em;
     }
 
-    html.dark .popup-source .label {
+    html.dark #metronome-header .label {
       color: #7cce7c;
     }
 
-    .popup-source:hover .label,
-    .popup-source:focus-within .label {
+    #metronome-header:hover .label,
+    #metronome-header:focus-within .label {
       text-decoration: underline;
     }
 
-    .popup-source:hover .popup,
-    .popup-source:focus-within .popup,
-    .popup-source .popup.popup-visible {
+    #metronome-header:hover .popup,
+    #metronome-header:focus-within .popup,
+    #metronome-header .popup.popup-visible {
       visibility: visible;
       filter: drop-shadow(8px 8px 10px grey);
     }
 
-    html.dark .popup-source:hover .popup,
-    html.dark .popup-source:focus-within .popup,
-    html.dark .popup-source .popup.popup-visible {
+    html.dark #metronome-header:hover .popup,
+    html.dark #metronome-header:focus-within .popup,
+    html.dark #metronome-header .popup.popup-visible {
       filter: drop-shadow(8px 8px 12px rgba(0, 0, 0, 0.8));
     }
 
@@ -317,8 +317,7 @@
 
 <body>
   <div id="container">
-    <div class="popup-source">
-      <span id="elapsed-time" aria-live="polite">&ndash;&ndash;&ndash;</span>
+    <div id="metronome-header">
       <button type="button" class="label" aria-label="Help" aria-expanded="false"
         aria-controls="help-popup">(?)</button>
       <div id="help-popup" class="popup">
@@ -389,6 +388,7 @@
           routine is interrupted by a phone call or a dog in desperate need of a belly rub.
         </p>
       </div>
+      <span id="elapsed-time" aria-live="polite">&ndash;&ndash;&ndash;</span>
     </div>
     <div id="indicators">
       <div id="progress-exercise" role="status" aria-live="polite">&ndash;&ndash;&ndash;</div>
